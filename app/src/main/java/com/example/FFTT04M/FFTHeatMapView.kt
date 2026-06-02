@@ -39,6 +39,13 @@ class FFTHeatMapView @JvmOverloads constructor(
     private var fftSize = 2048
     private var stepSize = 1024
     private var blurRadius = 0
+    private var playCursor = -1f
+    private val playCursorPaint = android.graphics.Paint().apply {
+        color = android.graphics.Color.WHITE
+        style = android.graphics.Paint.Style.STROKE
+        strokeWidth = 3f
+        isAntiAlias = true
+    }
     var isFrozen = false
 
     private var zoomFactorX = 1f
@@ -199,6 +206,17 @@ class FFTHeatMapView @JvmOverloads constructor(
     fun setBlur(radius: Int) {
         blurRadius = radius.coerceIn(0, 10)
         invalidate()
+    }
+
+    /** Playback playhead position in [0,1] across the time axis, or <0 to hide. */
+    fun setPlayCursor(progress: Float) {
+        playCursor = progress
+        postInvalidate()
+    }
+
+    fun clearPlayCursor() {
+        playCursor = -1f
+        postInvalidate()
     }
 
     fun setMaxHistory(count: Int) {
@@ -403,6 +421,12 @@ class FFTHeatMapView @JvmOverloads constructor(
                     }
                 }
             }
+        }
+
+        // Play cursor: vertical playhead synced to audio playback position (tracks pan/zoom).
+        if (playCursor in 0f..1f) {
+            val px = offsetX + playCursor * w * zoomFactorX
+            canvas.drawLine(px, offsetY, px, offsetY + h * zoomFactorY, playCursorPaint)
         }
 
         // Labels stay fixed but move vertically with pan/zoom

@@ -946,6 +946,27 @@ class ViewerActivity : AppCompatActivity() {
                 write(audioData, 0, audioData.size, AudioTrack.WRITE_BLOCKING)
                 play()
             }
+
+            // Drive the Play cursor across the spectrogram from the playback head position.
+            val track = audioTrack
+            if (track != null) {
+                val totalFrames = audioData.size.coerceAtLeast(1)
+                try {
+                    while (audioTrack === track) {
+                        val pos = track.playbackHeadPosition
+                        runOnUiThread {
+                            if (!isFinishing && !isDestroyed) {
+                                viewerFft.setPlayCursor((pos.toFloat() / totalFrames).coerceIn(0f, 1f))
+                            }
+                        }
+                        if (pos >= totalFrames || track.playState != AudioTrack.PLAYSTATE_PLAYING) break
+                        Thread.sleep(30)
+                    }
+                } catch (_: Throwable) {}
+                runOnUiThread {
+                    if (!isFinishing && !isDestroyed) viewerFft.clearPlayCursor()
+                }
+            }
         }
     }
 
