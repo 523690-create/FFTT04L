@@ -392,13 +392,29 @@ class MainActivity : AppCompatActivity() {
         val savedColorScheme = prefs.getInt("color_scheme", 0)
         spinner.setSelection(savedColorScheme)
         fftHeatMap.setColorScheme(savedColorScheme)
+        styleColorSpinner(spinner, savedColorScheme)
 
         spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
                 fftHeatMap.setColorScheme(position)
                 prefs.edit { putInt("color_scheme", position) }
+                styleColorSpinner(spinner, position)
             }
             override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+    }
+
+    /** Borrowed COLOR-control appearance (from FFTT02M): caption "COLOR", text=high-value color, bg=low-value color. */
+    private fun styleColorSpinner(spinner: Spinner, schemeIdx: Int) {
+        spinner.post {
+            val bg = fftHeatMap.lowColorFor(schemeIdx)
+            val fg = fftHeatMap.highColorFor(schemeIdx)
+            spinner.setBackgroundColor(bg)
+            (spinner.selectedView as? android.widget.TextView)?.apply {
+                setTextColor(fg)
+                setBackgroundColor(bg)
+                text = "COLOR"
+            }
         }
     }
 

@@ -174,13 +174,32 @@ class ViewerActivity : AppCompatActivity() {
         val savedColorScheme = prefs.getInt("color_scheme", 0)
         colorSpinner.setSelection(savedColorScheme)
         viewerFft.setColorScheme(savedColorScheme)
+        styleColorSpinner(savedColorScheme)
 
         colorSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(p0: AdapterView<*>?, p1: android.view.View?, pos: Int, p3: Long) {
                 viewerFft.setColorScheme(pos)
                 prefs.edit { putInt("color_scheme", pos) }
+                styleColorSpinner(pos)
             }
             override fun onNothingSelected(p0: AdapterView<*>?) {}
+        }
+    }
+
+    /**
+     * Borrowed COLOR-control appearance (from FFTT02M): caption "COLOR", text drawn in the
+     * scheme's high-value color, background in the scheme's low-value color.
+     */
+    private fun styleColorSpinner(schemeIdx: Int) {
+        colorSpinner.post {
+            val bg = viewerFft.lowColorFor(schemeIdx)
+            val fg = viewerFft.highColorFor(schemeIdx)
+            colorSpinner.setBackgroundColor(bg)
+            (colorSpinner.selectedView as? android.widget.TextView)?.apply {
+                setTextColor(fg)
+                setBackgroundColor(bg)
+                text = "COLOR"
+            }
         }
     }
 
