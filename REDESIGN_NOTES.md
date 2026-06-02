@@ -12,6 +12,14 @@ commit per change**, so non-optimal changes can be reverted selectively with
 
 ## Changelog (newest first)
 
+### Sweep+ (de-striped multi-resolution) — Enhance mode
+- What: New Enhance engine "Sweep+" (mode index 5). Computes each window size
+  (512/1024/2048/4096) on the common base time grid, normalizes each to its peak, and
+  merges across sizes by per-pixel **max** — eliminating the additive banding/stripes of
+  the original Sweep. Selected via the Enhance dialog; isolated in the refresh dispatch.
+- Files: `ViewerActivity.kt`
+- Revert: `git revert` the commit titled "Add Sweep+ de-striped multi-resolution Enhance mode".
+
 ### Play cursor (playhead synced to audio)
 - What: `FFTHeatMapView` draws a vertical playhead at the current playback position
   (transformed by pan/zoom like the time-grid). `ViewerActivity.playAudio` polls

@@ -58,7 +58,7 @@ class ViewerActivity : AppCompatActivity() {
     private var noiseRiseCoeff = 0.015f
     private var noiseFallCoeff = 0.05f
     private var isSweepActive = false
-    private val enhanceModeNames = arrayOf("Sweep", "Gaussian", "Bilateral", "TV Denoise", "Butterworth")
+    private val enhanceModeNames = arrayOf("Sweep", "Gaussian", "Bilateral", "TV Denoise", "Butterworth", "Sweep+")
     private val enhanceSelected = BooleanArray(enhanceModeNames.size)
 
     private val refreshLock = Any()
@@ -459,7 +459,8 @@ class ViewerActivity : AppCompatActivity() {
             }
 
             try {
-                if (isSweepActive) runFftSweepInternal(currentRefresh) 
+                if (enhanceSelected.getOrElse(5) { false }) runSweepPlusInternal(currentRefresh)
+                else if (isSweepActive) runFftSweepInternal(currentRefresh)
                 else refreshFftInternal(currentRefresh)
             } catch (e: InterruptedException) {
                 // Task cancelled
@@ -834,6 +835,99 @@ class ViewerActivity : AppCompatActivity() {
                 if (!isFinishing && !isDestroyed) {
                     viewerFft.updateFFT(normalized, force = true)
                 }
+            }
+        }
+    }
+
+    /**
+     * Sweep+ : de-striped multi-resolution map. Each window size is computed on the common base
+     * time grid, normalized to its own peak, then merged across sizes by per-pixel max - so no
+     * single resolution's additive overlap creates banding. Isolated; a failure here is contained.
+     */
+    private fun runSweepPlusInternal(refreshId: Int) {
+        val pcm = rawPcmData ?: return
+        val viewHeight = viewerFft.height
+        if (viewHeight <= 0) {
+            viewerFft.post { triggerRefresh() }
+            return
+        }
+        val sizes = intArrayOf(512, 1024, 2048, 4096)
+        val baseStep = 256
+        val baseSize = 512
+        var baseHistory = 0
+        var t = 0
+        while (t + baseSize <= pcm.size) { baseHistory++; t += baseStep }
+        if (baseHistory <= 0) return
+
+        for (f in filters) f.reset()
+        val filteredPcm = FloatArray(pcm.size)
+        for (i in pcm.indices) {
+            if (Thread.interrupted() || refreshId < refreshCount) throw InterruptedException()
+            var s = pcm[i]
+            for (fl in filters) s = fl.process(s)
+            filteredPcm[i] = s
+        }
+
+        val minFreq = 80f
+        val maxFreq = 10000f
+        val logMin = log10(minFreq)
+        val logMax = log10(maxFreq)
+
+        val combined = Array(baseHistory) { FloatArray(viewHeight) }
+
+        for (size in sizes) {
+            if (size > filteredPcm.size) continue
+            val hann = FloatArray(size) { i -> (0.5f * (1 - cos(2 * PI * i / (size - 1)))).toFloat() }
+            val mapping = IntArray(viewHeight) { y ->
+                val logF = logMax - (y.toFloat() / viewHeight) * (logMax - logMin)
+                val freq = 10.0.pow(logF.toDouble()).toFloat()
+                (freq * size / sampleRate).toInt().coerceIn(0, size / 2 - 1)
+            }
+            val sizeMap = Array(baseHistory) { FloatArray(viewHeight) }
+            var localMax = 1e-9f
+            for (c in 0 until baseHistory) {
+                if (Thread.interrupted() || refreshId < refreshCount) throw InterruptedException()
+                val start = c * baseStep
+                if (start + size > filteredPcm.size) break
+                val real = FloatArray(size)
+                val imag = FloatArray(size)
+                for (i in 0 until size) real[i] = filteredPcm[start + i] * hann[i]
+                FFTUtils.compute(real, imag)
+                for (y in 0 until viewHeight) {
+                    val bin = mapping[y]
+                    val mag = sqrt(real[bin] * real[bin] + imag[bin] * imag[bin])
+                    sizeMap[c][y] = mag
+                    if (mag > localMax) localMax = mag
+                }
+            }
+            val inv = 1f / localMax
+            for (c in 0 until baseHistory) for (y in 0 until viewHeight) {
+                val v = sizeMap[c][y] * inv
+                if (v > combined[c][y]) combined[c][y] = v
+            }
+        }
+
+        runOnUiThread {
+            if (isFinishing || isDestroyed) return@runOnUiThread
+            viewerFft.setParams(baseSize, sampleRate.toFloat(), baseStep)
+            viewerFft.setMaxHistory(baseHistory)
+            viewerFft.clearHistory()
+            viewerFft.isFrozen = true
+        }
+
+        val processed = applyEnhancements(combined)
+        var enhMax = 1e-9f
+        for (col in processed) for (v in col) if (v > enhMax) enhMax = v
+        val maxDB = 20 * log10(enhMax + 1e-9f)
+        for (c in 0 until baseHistory) {
+            if (Thread.interrupted() || refreshId < refreshCount) throw InterruptedException()
+            val normalized = FloatArray(viewHeight)
+            for (y in 0 until viewHeight) {
+                val dB = 20 * log10(processed[c][y] + 1e-9f)
+                normalized[y] = ((dB - (maxDB - 80)) / 80f).coerceIn(0f, 1f)
+            }
+            runOnUiThread {
+                if (!isFinishing && !isDestroyed) viewerFft.updateFFT(normalized, force = true)
             }
         }
     }
