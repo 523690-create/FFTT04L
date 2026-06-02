@@ -251,10 +251,9 @@ class MainActivity : AppCompatActivity() {
         }
 
         val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-        val fileName = "$timestamp.flac"
-        val file = File(getExternalFilesDir(null), fileName)
+        // Audio is saved by saveFragmentAudio below: FLAC preferred, WAV fallback.
         
-        encodeFlac(file, fragment)
+        saveFragmentAudio(getExternalFilesDir(null), timestamp, fragment)
         fftHeatMap.saveIcon(rect, "$timestamp.png")
         
         hideFrozenUi()
@@ -262,59 +261,122 @@ class MainActivity : AppCompatActivity() {
         startRecording()
     }
 
+    /**
+     * Persist the captured fragment. Prefers FLAC; if the FLAC encoder is unavailable on this
+     * device/SDK or encoding throws for any reason, transparently falls back to a WAV file.
+     * Returns the file actually written, or null if both paths failed.
+     */
+    private fun saveFragmentAudio(dir: File?, timestamp: String, data: FloatArray): File? {
+        val flacFile = File(dir, "$timestamp.flac")
+        try {
+            encodeFlac(flacFile, data)
+            return flacFile
+        } catch (e: Throwable) {
+            android.util.Log.w("FFTT04M", "FLAC encoding unavailable/failed (${e.message}); falling back to WAV")
+            try { if (flacFile.exists()) flacFile.delete() } catch (_: Throwable) {}
+        }
+        val wavFile = File(dir, "$timestamp.wav")
+        return try {
+            encodeWav(wavFile, data)
+            wavFile
+        } catch (e: Throwable) {
+            android.util.Log.e("FFTT04M", "WAV fallback also failed: ${e.message}")
+            try { if (wavFile.exists()) wavFile.delete() } catch (_: Throwable) {}
+            null
+        }
+    }
+
     private fun encodeFlac(file: File, data: FloatArray) {
         val format = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_FLAC, sampleRate, 1)
         format.setInteger(MediaFormat.KEY_BIT_RATE, 128000)
         format.setInteger(MediaFormat.KEY_FLAC_COMPRESSION_LEVEL, 5)
 
+        // createEncoderByType throws if no FLAC encoder exists on this device -> caller falls back to WAV.
         val codec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_AUDIO_FLAC)
-        codec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
-        codec.start()
+        var fos: FileOutputStream? = null
+        try {
+            codec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+            codec.start()
+            fos = FileOutputStream(file)
+            val info = MediaCodec.BufferInfo()
+            var inputDone = false
+            var outputDone = false
+            var sampleIndex = 0
 
-        val fos = FileOutputStream(file)
-        val info = MediaCodec.BufferInfo()
-        var inputDone = false
-        var outputDone = false
-        var sampleIndex = 0
+            while (!outputDone) {
+                if (!inputDone) {
+                    val inputBufferIndex = codec.dequeueInputBuffer(10000)
+                    if (inputBufferIndex >= 0) {
+                        val inputBuffer = codec.getInputBuffer(inputBufferIndex)!!
+                        inputBuffer.clear()
 
-        while (!outputDone) {
-            if (!inputDone) {
-                val inputBufferIndex = codec.dequeueInputBuffer(10000)
-                if (inputBufferIndex >= 0) {
-                    val inputBuffer = codec.getInputBuffer(inputBufferIndex)!!
-                    inputBuffer.clear()
-                    
-                    val samplesToCopy = min(data.size - sampleIndex, inputBuffer.remaining() / 2)
-                    for (unused in 0 until samplesToCopy) {
-                        val s = (data[sampleIndex++] * 32767).toInt().coerceIn(-32768, 32767).toShort()
-                        inputBuffer.putShort(s)
+                        val samplesToCopy = min(data.size - sampleIndex, inputBuffer.remaining() / 2)
+                        for (unused in 0 until samplesToCopy) {
+                            val s = (data[sampleIndex++] * 32767).toInt().coerceIn(-32768, 32767).toShort()
+                            inputBuffer.putShort(s)
+                        }
+
+                        if (sampleIndex >= data.size) {
+                            codec.queueInputBuffer(inputBufferIndex, 0, inputBuffer.position(), 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+                            inputDone = true
+                        } else {
+                            codec.queueInputBuffer(inputBufferIndex, 0, inputBuffer.position(), 0, 0)
+                        }
                     }
+                }
 
-                    if (sampleIndex >= data.size) {
-                        codec.queueInputBuffer(inputBufferIndex, 0, inputBuffer.position(), 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
-                        inputDone = true
-                    } else {
-                        codec.queueInputBuffer(inputBufferIndex, 0, inputBuffer.position(), 0, 0)
+                val outputBufferIndex = codec.dequeueOutputBuffer(info, 10000)
+                if (outputBufferIndex >= 0) {
+                    val outputBuffer = codec.getOutputBuffer(outputBufferIndex)!!
+                    val outData = ByteArray(info.size)
+                    outputBuffer.get(outData, 0, info.size)
+                    fos.write(outData)
+                    codec.releaseOutputBuffer(outputBufferIndex, false)
+                    if ((info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
+                        outputDone = true
                     }
                 }
             }
-
-            val outputBufferIndex = codec.dequeueOutputBuffer(info, 10000)
-            if (outputBufferIndex >= 0) {
-                val outputBuffer = codec.getOutputBuffer(outputBufferIndex)!!
-                val outData = ByteArray(info.size)
-                outputBuffer.get(outData, 0, info.size)
-                fos.write(outData)
-                codec.releaseOutputBuffer(outputBufferIndex, false)
-                if ((info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
-                    outputDone = true
-                }
-            }
+        } finally {
+            try { codec.stop() } catch (_: Throwable) {}
+            try { codec.release() } catch (_: Throwable) {}
+            try { fos?.close() } catch (_: Throwable) {}
         }
+    }
 
-        codec.stop()
-        codec.release()
-        fos.close()
+    /** Minimal 16-bit PCM, mono, little-endian WAV writer used as the FLAC fallback. */
+    private fun encodeWav(file: File, data: FloatArray) {
+        val channels = 1
+        val bitsPerSample = 16
+        val byteRate = sampleRate * channels * bitsPerSample / 8
+        val blockAlign = channels * bitsPerSample / 8
+        val dataSize = data.size * 2
+        FileOutputStream(file).use { fos ->
+            val header = ByteArray(44)
+            val bb = java.nio.ByteBuffer.wrap(header).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+            bb.put(byteArrayOf('R'.code.toByte(), 'I'.code.toByte(), 'F'.code.toByte(), 'F'.code.toByte()))
+            bb.putInt(36 + dataSize)
+            bb.put(byteArrayOf('W'.code.toByte(), 'A'.code.toByte(), 'V'.code.toByte(), 'E'.code.toByte()))
+            bb.put(byteArrayOf('f'.code.toByte(), 'm'.code.toByte(), 't'.code.toByte(), ' '.code.toByte()))
+            bb.putInt(16)
+            bb.putShort(1)
+            bb.putShort(channels.toShort())
+            bb.putInt(sampleRate)
+            bb.putInt(byteRate)
+            bb.putShort(blockAlign.toShort())
+            bb.putShort(bitsPerSample.toShort())
+            bb.put(byteArrayOf('d'.code.toByte(), 'a'.code.toByte(), 't'.code.toByte(), 'a'.code.toByte()))
+            bb.putInt(dataSize)
+            fos.write(header)
+
+            val pcm = ByteArray(dataSize)
+            val pb = java.nio.ByteBuffer.wrap(pcm).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+            for (sample in data) {
+                val s = (sample * 32767f).toInt().coerceIn(-32768, 32767).toShort()
+                pb.putShort(s)
+            }
+            fos.write(pcm)
+        }
     }
 
     private fun setupColorSpinner() {
