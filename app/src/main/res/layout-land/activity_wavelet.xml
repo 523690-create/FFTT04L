@@ -27,6 +27,7 @@
     <com.google.android.material.slider.Slider android:id="@+id/sliderSampling" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
     <com.google.android.material.slider.Slider android:id="@+id/sliderThreshold" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
     <com.google.android.material.slider.Slider android:id="@+id/sliderColor" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
+    <Spinner android:id="@+id/vColorSpinner" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
 
     <TextView android:id="@+id/txtLevelValue" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
     <TextView android:id="@+id/txtOrderValue" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>

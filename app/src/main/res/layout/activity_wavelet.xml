@@ -334,26 +334,12 @@
                 android:layout_weight="1"
                 android:orientation="vertical"
                 android:gravity="center_horizontal">
-                <TextView android:layout_width="wrap_content" android:layout_height="24dp" android:text="COLOR" android:textColor="#FFFFFF" android:textSize="10sp" android:textStyle="bold"/>
-                <FrameLayout android:layout_width="match_parent" android:layout_height="match_parent">
-                    <com.google.android.material.slider.Slider app:trackCornerSize="0dp"
-                        android:id="@+id/sliderColor"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:valueFrom="0.0"
-                        android:valueTo="3.0"
-                        android:value="0.0"
-                        android:stepSize="1.0"
-                        android:orientation="vertical"
-                        app:labelBehavior="gone"
-                        app:trackHeight="32dp"
-                        app:thumbRadius="16dp"
-                        app:thumbColor="#FFFFFF"
-                        app:trackColorActive="#FFFF00"
-                        app:trackColorInactive="#333333"
-                        android:layout_gravity="center" />
-                    <TextView android:id="@+id/txtColorValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Default" android:textColor="#000000" android:textSize="10sp" android:textStyle="bold" android:layout_gravity="top|center_horizontal" android:elevation="4dp"/>
-                </FrameLayout>
+                <Spinner
+                    android:id="@+id/vColorSpinner"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:overlapAnchor="false" />
 
             </LinearLayout>
 

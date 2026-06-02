@@ -34,13 +34,12 @@ class WaveletActivity : AppCompatActivity() {
     private lateinit var sliderLevel: Slider
     private lateinit var sliderSampling: Slider
     private lateinit var sliderThreshold: Slider
-    private lateinit var sliderColor: Slider
+    private lateinit var colorSpinner: Spinner
     
     private lateinit var txtLevelValue: TextView
     private lateinit var txtOrderValue: TextView
     private lateinit var txtSamplingValue: TextView
     private lateinit var txtThresholdValue: TextView
-    private lateinit var txtColorValue: TextView
 
     private var filePath: String? = null
     private var pcmData: FloatArray? = null
@@ -100,13 +99,12 @@ class WaveletActivity : AppCompatActivity() {
         sliderLevel = findViewById(R.id.sliderLevel)
         sliderSampling = findViewById(R.id.sliderSampling)
         sliderThreshold = findViewById(R.id.sliderThreshold)
-        sliderColor = findViewById(R.id.sliderColor)
+        colorSpinner = findViewById(R.id.vColorSpinner)
 
         txtLevelValue = findViewById(R.id.txtLevelValue)
         txtOrderValue = findViewById(R.id.txtOrderValue)
         txtSamplingValue = findViewById(R.id.txtSamplingValue)
         txtThresholdValue = findViewById(R.id.txtThresholdValue)
-        txtColorValue = findViewById(R.id.txtColorValue)
 
         prefs = getSharedPreferences("app_settings", MODE_PRIVATE)
         loadPrefs()
@@ -125,10 +123,7 @@ class WaveletActivity : AppCompatActivity() {
         adjustSliderThickness(sliderSampling, txtSamplingValue)
         adjustSliderThickness(sliderThreshold, txtThresholdValue)
         
-        // Color slider should be yellow
-        sliderColor.setTrackActiveTintList(android.content.res.ColorStateList.valueOf(Color.YELLOW))
-        sliderColor.setTrackInactiveTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#7F7F00")))
-        adjustSliderThickness(sliderColor, txtColorValue)
+        // Color control is a spinner now (styled in setupColorSpinner); no slider tinting needed.
     }
 
     private fun adjustSliderThickness(slider: Slider, label: TextView?) {
@@ -305,14 +300,11 @@ class WaveletActivity : AppCompatActivity() {
         sliderOrder.setSafeValue(waveletOrder.toFloat())
         sliderSampling.setSafeValue(targetFreq)
         sliderThreshold.setSafeValue(threshold)
-        sliderColor.setSafeValue(colorSchemeIdx.toFloat())
         
         txtLevelValue.text = decompositionLevel.toString()
         txtOrderValue.text = waveletOrder.toString()
         txtSamplingValue.text = if (targetFreq >= 1000) "${(targetFreq/1000).toInt()}\nkHz" else "${targetFreq.toInt()}\nHz"
         txtThresholdValue.text = String.format(java.util.Locale.US, "%.3f", threshold)
-        val colorNames = arrayOf("Default", "Viridis", "Magma", "Gray")
-        txtColorValue.text = colorNames[colorSchemeIdx.coerceIn(0, 3)]
 
         updateOrderSliderRange()
         
@@ -472,14 +464,39 @@ class WaveletActivity : AppCompatActivity() {
                 runDwt()
             }
         }
-        sliderColor.addOnChangeListener { s, value, fromUser ->
-            if (fromUser) {
-                colorSchemeIdx = value.toInt()
-                val colorNames = arrayOf("Default", "Viridis", "Magma", "Gray")
-                txtColorValue.text = colorNames[colorSchemeIdx.coerceIn(0, 3)]
-                waveletView.setColorScheme(colorSchemeIdx)
-                prefs.edit().putInt("color_scheme", colorSchemeIdx).apply()
-                updateLabelPosition(s, txtColorValue)
+        setupColorSpinner()
+    }
+
+    private fun setupColorSpinner() {
+        val colorNames = arrayOf("Default", "Viridis", "Magma", "Gray")
+        val displayNames = colorNames.map { "Color:$it" }
+        val adapter = ArrayAdapter(this, R.layout.spinner_item_gold, displayNames)
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        colorSpinner.adapter = adapter
+        colorSpinner.setSelection(colorSchemeIdx.coerceIn(0, 3))
+        waveletView.setColorScheme(colorSchemeIdx)
+        styleColorSpinner(colorSchemeIdx)
+        colorSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                colorSchemeIdx = position
+                waveletView.setColorScheme(position)
+                prefs.edit { putInt("color_scheme", position) }
+                styleColorSpinner(position)
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+    }
+
+    /** Same COLOR-control appearance as Listen/FFT: caption "COLOR", text=high color, bg=low color. */
+    private fun styleColorSpinner(schemeIdx: Int) {
+        colorSpinner.post {
+            val bg = waveletView.lowColorFor(schemeIdx)
+            val fg = waveletView.highColorFor(schemeIdx)
+            colorSpinner.setBackgroundColor(bg)
+            (colorSpinner.selectedView as? TextView)?.apply {
+                setTextColor(fg)
+                setBackgroundColor(bg)
+                text = "COLOR"
             }
         }
     }

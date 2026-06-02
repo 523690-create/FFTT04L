@@ -131,6 +131,12 @@ class WaveletView @JvmOverloads constructor(
     )
     private var activeColors = colorSchemes[0]
 
+    /** Lowest-value (bottom-of-scale) color of a scheme - used as the COLOR control background. */
+    fun lowColorFor(index: Int): Int = colorSchemes[index.coerceIn(0, colorSchemes.size - 1)].first()
+
+    /** Highest-value (top-of-scale) color of a scheme - used as the COLOR control text color. */
+    fun highColorFor(index: Int): Int = colorSchemes[index.coerceIn(0, colorSchemes.size - 1)].last()
+
     fun setLogScale(enabled: Boolean) {
         if (isLogScale != enabled) {
             isLogScale = enabled
