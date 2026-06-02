@@ -385,6 +385,22 @@ class FFTHeatMapView @JvmOverloads constructor(
         }
         canvas.restore()
 
+        // Borrowed from FFTT02M: when blur is active, overlay vertical time-grid lines every 250 ms.
+        if (blurRadius > 0) {
+            val msPerFrame = stepSize.toFloat() / sampleRate * 1000f
+            if (msPerFrame > 0f) {
+                val framesPerLine = 250f / msPerFrame
+                if (framesPerLine >= 1f) {
+                    var frame = framesPerLine
+                    while (frame < maxHistory) {
+                        val x = (frame / maxHistory) * w
+                        canvas.drawLine(x, 0f, x, h, linePaint)
+                        frame += framesPerLine
+                    }
+                }
+            }
+        }
+
         // Labels stay fixed but move vertically with pan/zoom
         val targetFreqs = floatArrayOf(100f, 300f, 1000f, 3000f, 8000f)
         for (f in targetFreqs) {
