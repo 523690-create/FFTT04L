@@ -908,10 +908,14 @@ class ViewerActivity : AppCompatActivity() {
                 }
             }
 
-            // Convert to ShortArray for AudioTrack
-            val audioData = ShortArray(filteredPcm.size)
-            for (i in filteredPcm.indices) {
-                audioData[i] = (filteredPcm[i].coerceIn(-1f, 1f) * 32767).toInt().toShort()
+            // Play the raw, unmodified recording. The EQ biquads and the noise-filter spectral
+            // subtraction are visualization aids; applying them to playback distorts the audio
+            // (EQ boosts clip past full-scale, and the spectral-subtraction reconstruction
+            // overwrites overlapping windowed blocks with no overlap-add/COLA normalization).
+            // So playback ignores the Filter settings, matching FFTT02M's raw playback.
+            val audioData = ShortArray(pcm.size)
+            for (i in pcm.indices) {
+                audioData[i] = (pcm[i].coerceIn(-1f, 1f) * 32767).toInt().toShort()
             }
 
             val bufferSize = AudioTrack.getMinBufferSize(
