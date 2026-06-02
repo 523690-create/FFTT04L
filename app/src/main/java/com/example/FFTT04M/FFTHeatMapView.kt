@@ -386,15 +386,19 @@ class FFTHeatMapView @JvmOverloads constructor(
         canvas.restore()
 
         // Borrowed from FFTT02M: when blur is active, overlay vertical time-grid lines every 250 ms.
+        // Transformed by the same pan/zoom as the spectrogram so the lines track the time axis
+        // under pinch/zoom (offsetX/zoomFactorX horizontally, offsetY/zoomFactorY for the span).
         if (blurRadius > 0) {
             val msPerFrame = stepSize.toFloat() / sampleRate * 1000f
             if (msPerFrame > 0f) {
                 val framesPerLine = 250f / msPerFrame
                 if (framesPerLine >= 1f) {
+                    val yTop = offsetY
+                    val yBottom = offsetY + h * zoomFactorY
                     var frame = framesPerLine
                     while (frame < maxHistory) {
-                        val x = (frame / maxHistory) * w
-                        canvas.drawLine(x, 0f, x, h, linePaint)
+                        val x = offsetX + (frame / maxHistory) * w * zoomFactorX
+                        if (x in 0f..w) canvas.drawLine(x, yTop, x, yBottom, linePaint)
                         frame += framesPerLine
                     }
                 }
