@@ -58,6 +58,8 @@ class ViewerActivity : AppCompatActivity() {
     private var noiseRiseCoeff = 0.015f
     private var noiseFallCoeff = 0.05f
     private var isSweepActive = false
+    private val enhanceModeNames = arrayOf("Sweep", "Gaussian", "Bilateral", "TV Denoise", "Butterworth")
+    private val enhanceSelected = BooleanArray(enhanceModeNames.size)
 
     private val refreshLock = Any()
     private var refreshCount = 0
@@ -150,7 +152,7 @@ class ViewerActivity : AppCompatActivity() {
             setupColorSpinner()
             setupNoiseFilter()
             setupBlurSpinner()
-            setupSweepToggle()
+            setupEnhanceButton()
         } else {
             // Restore saved settings even if controls are hidden
             val savedColorScheme = prefs.getInt("color_scheme", 0)
@@ -203,27 +205,132 @@ class ViewerActivity : AppCompatActivity() {
         }
     }
 
-    private fun setupSweepToggle() {
+    // --- Enhance control (borrowed from FFTT02M, extended to mixed-mode checkboxes) ---
+    // Index 0 = "Sweep" (FFTT04M's own multi-resolution sweep); indices 1..4 are denoise
+    // post-filters applied in sequence to the spectrogram.
+
+    private fun setupEnhanceButton() {
+        val mask = prefs.getInt("enhance_mask", 0)
+        for (i in enhanceSelected.indices) enhanceSelected[i] = (mask shr i) and 1 == 1
+        isSweepActive = enhanceSelected[0]
+        updateEnhanceButton()
         btnSweep.setOnClickListener {
-            isSweepActive = !isSweepActive
-            updateSweepButtonState()
-            triggerRefresh()
+            val working = enhanceSelected.copyOf()
+            androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Enhance (mixed mode)")
+                .setMultiChoiceItems(enhanceModeNames, working) { _, which, checked ->
+                    working[which] = checked
+                }
+                .setPositiveButton("Apply") { _, _ ->
+                    working.copyInto(enhanceSelected)
+                    var m = 0
+                    for (i in enhanceSelected.indices) if (enhanceSelected[i]) m = m or (1 shl i)
+                    prefs.edit { putInt("enhance_mask", m) }
+                    isSweepActive = enhanceSelected[0]
+                    updateEnhanceButton()
+                    triggerRefresh()
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
         }
-        updateSweepButtonState()
     }
 
-    private fun updateSweepButtonState() {
-        if (isSweepActive) {
-            btnSweep.text = getString(R.string.sweep_on)
-            btnSweep.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.RED)
-            sizeSpinner.isEnabled = false
-            stepSpinner.isEnabled = false
-        } else {
-            btnSweep.text = getString(R.string.sweep_off)
-            btnSweep.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#FF69B4"))
-            sizeSpinner.isEnabled = true
-            stepSpinner.isEnabled = true
+    private fun updateEnhanceButton() {
+        val count = enhanceSelected.count { it }
+        btnSweep.text = if (count == 0) "ENHANCE" else "ENH:$count"
+        btnSweep.backgroundTintList = android.content.res.ColorStateList.valueOf(
+            if (count == 0) Color.parseColor("#FF69B4") else Color.RED
+        )
+        // Sweep recomputes FFT sizes itself, so lock the size/step spinners while it is active.
+        sizeSpinner.isEnabled = !enhanceSelected[0]
+        stepSpinner.isEnabled = !enhanceSelected[0]
+    }
+
+    /**
+     * Mixed-mode spectrogram enhancement. Applies each selected denoise filter (indices 1..4)
+     * in sequence. Index 0 ("Sweep") is handled upstream by runFftSweepInternal.
+     */
+    private fun applyEnhancements(input: Array<FloatArray>): Array<FloatArray> {
+        var data = input
+        if (enhanceSelected.getOrElse(1) { false }) data = enhGaussian(data)
+        if (enhanceSelected.getOrElse(2) { false }) data = enhBilateral(data)
+        if (enhanceSelected.getOrElse(3) { false }) data = enhTvDenoise(data)
+        if (enhanceSelected.getOrElse(4) { false }) data = enhButterworth(data)
+        return data
+    }
+
+    private fun enhGaussian(history: Array<FloatArray>): Array<FloatArray> {
+        val rows = history.size
+        if (rows == 0) return history
+        val cols = history[0].size
+        val result = Array(rows) { FloatArray(cols) }
+        val kernel = floatArrayOf(0.0625f, 0.125f, 0.0625f, 0.125f, 0.25f, 0.125f, 0.0625f, 0.125f, 0.0625f)
+        for (r in 0 until rows) for (c in 0 until cols) {
+            var sum = 0f
+            for (i in -1..1) for (j in -1..1) {
+                val rr = (r + i).coerceIn(0, rows - 1)
+                val cc = (c + j).coerceIn(0, cols - 1)
+                sum += history[rr][cc] * kernel[(i + 1) * 3 + (j + 1)]
+            }
+            result[r][c] = sum
         }
+        return result
+    }
+
+    private fun enhBilateral(history: Array<FloatArray>): Array<FloatArray> {
+        val rows = history.size
+        if (rows == 0) return history
+        val cols = history[0].size
+        val result = Array(rows) { FloatArray(cols) }
+        val sigmaD = 2.0f
+        val sigmaR = 0.1f
+        for (r in 0 until rows) for (c in 0 until cols) {
+            var sum = 0f
+            var norm = 0f
+            val center = history[r][c]
+            for (i in -2..2) for (j in -2..2) {
+                val rr = (r + i).coerceIn(0, rows - 1)
+                val cc = (c + j).coerceIn(0, cols - 1)
+                val v = history[rr][cc]
+                val distSq = (i * i + j * j).toFloat()
+                val rangeSq = (v - center) * (v - center)
+                val w = exp(-distSq / (2 * sigmaD * sigmaD) - rangeSq / (2 * sigmaR * sigmaR))
+                sum += v * w
+                norm += w
+            }
+            result[r][c] = if (norm > 0f) sum / norm else center
+        }
+        return result
+    }
+
+    private fun enhTvDenoise(history: Array<FloatArray>): Array<FloatArray> {
+        val rows = history.size
+        if (rows == 0) return history
+        val cols = history[0].size
+        val result = Array(rows) { history[it].copyOf() }
+        val lambda = 0.5f
+        repeat(5) {
+            for (r in 1 until rows - 1) for (c in 1 until cols - 1) {
+                val diffR = result[r + 1][c] - result[r - 1][c]
+                val diffC = result[r][c + 1] - result[r][c - 1]
+                result[r][c] = result[r][c] + lambda * (diffR + diffC) / 4f
+            }
+        }
+        return result
+    }
+
+    private fun enhButterworth(history: Array<FloatArray>): Array<FloatArray> {
+        val rows = history.size
+        if (rows == 0) return history
+        val cols = history[0].size
+        val result = Array(rows) { FloatArray(cols) }
+        val alpha = 0.3f
+        for (r in 0 until rows) for (c in 0 until cols) {
+            val prevR = if (r > 0) result[r - 1][c] else history[r][c]
+            val prevC = if (c > 0) result[r][c - 1] else history[r][c]
+            result[r][c] = history[r][c] * alpha + (prevR + prevC) * (1f - alpha) / 2f
+        }
+        return result
     }
 
     private fun setupBlurSpinner() {
@@ -592,12 +699,15 @@ class ViewerActivity : AppCompatActivity() {
             c++
         }
 
-        val maxDB = 20 * log10(globalMax + 1e-9f)
+        val processed = applyEnhancements(accumulationBuffer)
+        var enhMax = 1e-9f
+        for (col in processed) for (v in col) if (v > enhMax) enhMax = v
+        val maxDB = 20 * log10(enhMax + 1e-9f)
         for (idx in 0 until columnCount) {
             if (Thread.interrupted() || refreshId < refreshCount) throw InterruptedException()
             val normalized = FloatArray(viewHeight)
             for (y in 0 until viewHeight) {
-                val dB = 20 * log10(accumulationBuffer[idx][y] + 1e-9f)
+                val dB = 20 * log10(processed[idx][y] + 1e-9f)
                 normalized[y] = ((dB - (maxDB - 80)) / 80f).coerceIn(0f, 1f)
             }
             runOnUiThread {
@@ -709,12 +819,15 @@ class ViewerActivity : AppCompatActivity() {
             viewerFft.isFrozen = true
         }
         
-        val maxDB = 20 * log10(globalMax + 1e-9f)
+        val processed = applyEnhancements(accumulationBuffer)
+        var enhMax = 1e-9f
+        for (col in processed) for (v in col) if (v > enhMax) enhMax = v
+        val maxDB = 20 * log10(enhMax + 1e-9f)
         for (c in 0 until baseHistory) {
             if (Thread.interrupted() || refreshId < refreshCount) throw InterruptedException()
             val normalized = FloatArray(viewHeight)
             for (y in 0 until viewHeight) {
-                val dB = 20 * log10(accumulationBuffer[c][y] + 1e-9f)
+                val dB = 20 * log10(processed[c][y] + 1e-9f)
                 normalized[y] = ((dB - (maxDB - 80)) / 80f).coerceIn(0f, 1f)
             }
             runOnUiThread {
