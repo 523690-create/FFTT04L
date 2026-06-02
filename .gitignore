@@ -1,0 +1,44 @@
+# Built application files
+*.apk
+*.aab
+*.aar
+*.ap_
+
+# Dalvik/ART VM & Java
+*.dex
+*.class
+
+# Generated output
+bin/
+gen/
+out/
+build/
+
+# Gradle
+.gradle/
+
+# Kotlin (build services, KMP)
+.kotlin/
+
+# Local configuration (machine-specific SDK path, signing, etc.)
+local.properties
+
+# Android Studio / IntelliJ IDEA
+*.iml
+.idea/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Signing keys — never commit
+*.jks
+*.keystore
+
+# iOS / KMP native (for the future iosApp on macOS)
+xcuserdata/
+*.xcuserstate
+
+# Logs / profiling / OS cruft
+*.log
+*.hprof
+.DS_Store
