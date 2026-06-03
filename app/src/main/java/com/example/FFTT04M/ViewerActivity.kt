@@ -19,6 +19,11 @@ import androidx.core.view.isGone
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Button
+import android.widget.CheckBox
+import android.widget.LinearLayout
+import android.widget.RadioButton
+import android.widget.RadioGroup
+import android.widget.ScrollView
 import android.widget.Spinner
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -210,33 +215,80 @@ class ViewerActivity : AppCompatActivity() {
     }
 
     // --- Enhance control (borrowed from FFTT02M, extended to mixed-mode checkboxes) ---
-    // Indices 0..3 pick the engine that builds the base map; indices 4..8 are post-processors
-    // (denoise filters + Multitaper) applied in sequence on top of the engine output.
+    // Indices 0..3 are the mutually-exclusive engines that build the base map (shown as radio
+    // buttons); indices 4..8 are post-processors (denoise filters + Multitaper) that stack on top
+    // of the engine output (shown as checkboxes).
 
     private fun setupEnhanceButton() {
         // "_v2" key: the mode list was reordered when the simple Sweep engine was dropped, so any
         // old saved mask would map to the wrong modes. Start fresh under a new key.
         val mask = prefs.getInt("enhance_mask_v2", 0)
         for (i in enhanceSelected.indices) enhanceSelected[i] = (mask shr i) and 1 == 1
-        updateEnhanceButton()
-        btnSweep.setOnClickListener {
-            val working = enhanceSelected.copyOf()
-            androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle("Enhance (mixed mode)")
-                .setMultiChoiceItems(enhanceModeNames, working) { _, which, checked ->
-                    working[which] = checked
-                }
-                .setPositiveButton("Apply") { _, _ ->
-                    working.copyInto(enhanceSelected)
-                    var m = 0
-                    for (i in enhanceSelected.indices) if (enhanceSelected[i]) m = m or (1 shl i)
-                    prefs.edit { putInt("enhance_mask_v2", m) }
-                    updateEnhanceButton()
-                    triggerRefresh()
-                }
-                .setNegativeButton("Cancel", null)
-                .show()
+        // Safety: only one engine may be active. If a stale mask has several, keep the highest-priority.
+        var seenEngine = false
+        for (i in 0 until engineCount) {
+            if (enhanceSelected[i]) {
+                if (seenEngine) enhanceSelected[i] = false else seenEngine = true
+            }
         }
+        updateEnhanceButton()
+        btnSweep.setOnClickListener { showEnhanceDialog() }
+    }
+
+    private fun showEnhanceDialog() {
+        val density = resources.displayMetrics.density
+        val pad = (16 * density).toInt()
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(pad, pad / 2, pad, 0)
+        }
+
+        // Engines: one exclusive choice (radio), with an explicit "None" = plain STFT.
+        root.addView(enhanceHeader("Engine (pick one)"))
+        val engineGroup = RadioGroup(this)
+        val noneId = View.generateViewId()
+        engineGroup.addView(RadioButton(this).apply { id = noneId; text = "None (plain STFT)" })
+        val engineIds = IntArray(engineCount)
+        var checkedEngineId = noneId
+        for (i in 0 until engineCount) {
+            val id = View.generateViewId()
+            engineIds[i] = id
+            engineGroup.addView(RadioButton(this).apply { this.id = id; text = enhanceModeNames[i] })
+            if (enhanceSelected[i]) checkedEngineId = id
+        }
+        engineGroup.check(checkedEngineId)
+        root.addView(engineGroup)
+
+        // Post-processors: independent toggles (checkboxes) that stack.
+        root.addView(enhanceHeader("Post-processors (stack)"))
+        val postBoxes = ArrayList<Pair<Int, CheckBox>>()
+        for (i in engineCount until enhanceModeNames.size) {
+            val cb = CheckBox(this).apply { text = enhanceModeNames[i]; isChecked = enhanceSelected[i] }
+            root.addView(cb)
+            postBoxes.add(i to cb)
+        }
+
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Enhance")
+            .setView(ScrollView(this).apply { addView(root) })
+            .setPositiveButton("Apply") { _, _ ->
+                for (i in 0 until engineCount) enhanceSelected[i] = (engineIds[i] == engineGroup.checkedRadioButtonId)
+                for ((i, cb) in postBoxes) enhanceSelected[i] = cb.isChecked
+                var m = 0
+                for (i in enhanceSelected.indices) if (enhanceSelected[i]) m = m or (1 shl i)
+                prefs.edit { putInt("enhance_mask_v2", m) }
+                updateEnhanceButton()
+                triggerRefresh()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun enhanceHeader(text: String): TextView = TextView(this).apply {
+        this.text = text
+        setTextColor(Color.parseColor("#FF69B4"))
+        setTypeface(typeface, android.graphics.Typeface.BOLD)
+        setPadding(0, (10 * resources.displayMetrics.density).toInt(), 0, 0)
     }
 
     private fun updateEnhanceButton() {
