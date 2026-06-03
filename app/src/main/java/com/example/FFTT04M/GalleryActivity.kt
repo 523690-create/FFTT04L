@@ -98,6 +98,7 @@ class GalleryActivity : AppCompatActivity() {
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
             val view = LayoutInflater.from(parent.context).inflate(R.layout.gallery_item, parent, false)
+            applyAutoSizeText(view)
             return ViewHolder(view)
         }
 

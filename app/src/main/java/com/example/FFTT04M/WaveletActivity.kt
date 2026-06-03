@@ -127,6 +127,7 @@ class WaveletActivity : AppCompatActivity() {
         prefs = getSharedPreferences(prefsNameForFile(filePath), MODE_PRIVATE)
         loadPrefs()
         setupControls()
+        applyAutoSizeText(findViewById(android.R.id.content))
 
         waveletView.post {
             updateAllLabelPositions()

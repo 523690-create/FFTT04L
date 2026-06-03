@@ -97,6 +97,7 @@ class ViewerActivity : AppCompatActivity() {
         prefs = getSharedPreferences(prefsNameForFile(filePath), Context.MODE_PRIVATE)
 
         setupControls()
+        applyAutoSizeText(findViewById(android.R.id.content))
 
         viewerFft.post {
             // Restore this recording's saved pan/zoom, and persist it whenever the user changes it.

@@ -156,6 +156,8 @@ class MainActivity : AppCompatActivity() {
             updateAllLabelPositions()
         }
 
+        applyAutoSizeText(findViewById(android.R.id.content))
+
         fftHeatMap.onSingleTap = {
             fftHeatMap.isFrozen = !fftHeatMap.isFrozen
             if (fftHeatMap.isFrozen) {
