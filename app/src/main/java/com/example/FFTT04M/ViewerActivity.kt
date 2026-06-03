@@ -42,6 +42,7 @@ class ViewerActivity : AppCompatActivity() {
     private lateinit var stepSpinner: Spinner
     private lateinit var colorSpinner: Spinner
     private lateinit var blurSpinner: Spinner
+    private lateinit var enhanceSpinner: Spinner
     private lateinit var btnSweep: Button
     private var viewerProgress: android.widget.ProgressBar? = null
 
@@ -174,6 +175,7 @@ class ViewerActivity : AppCompatActivity() {
         stepSpinner = findViewById(R.id.vStepSpinner)
         colorSpinner = findViewById(R.id.vColorSpinner)
         blurSpinner = findViewById(R.id.vBlurSpinner)
+        enhanceSpinner = findViewById(R.id.vEnhanceSpinner)
         btnSweep = findViewById(R.id.btnViewerSweep)
 
         findViewById<Button>(R.id.btnViewerGalleryTop).setOnClickListener { finish() }
@@ -202,6 +204,7 @@ class ViewerActivity : AppCompatActivity() {
         setupColorSpinner()
         setupNoiseFilter()
         setupBlurSpinner()
+        setupEnhanceSpinner()
         setupEnhanceButton()
 
         setupEqSliders()
@@ -274,6 +277,46 @@ class ViewerActivity : AppCompatActivity() {
         }
     }
 
+    private fun setupEnhanceSpinner() {
+        val modeList = listOf("None (plain STFT)") + enhanceModeNames.toList()
+        val enhanceDisplayNames = modeList.map { getString(R.string.enhance_prefix, it) }
+        val enhanceAdapter = ArrayAdapter(this, R.layout.spinner_item_enhance_orange, enhanceDisplayNames)
+        enhanceAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        enhanceSpinner.adapter = enhanceAdapter
+        updateEnhanceSpinner()
+
+        enhanceSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(p0: AdapterView<*>?, p1: android.view.View?, pos: Int, p3: Long) {
+                // Single selection via spinner: only engines (0..4), no post-processors via spinner
+                for (i in enhanceSelected.indices) enhanceSelected[i] = false
+                if (pos > 0) {
+                    val engineIdx = pos - 1
+                    if (engineIdx < engineCount) {
+                        enhanceSelected[engineIdx] = true
+                    }
+                }
+                var m = 0
+                for (i in enhanceSelected.indices) if (enhanceSelected[i]) m = m or (1 shl i)
+                prefs.edit { putInt("enhance_mask_v3", m) }
+                updateEnhanceButton()
+                triggerRefresh()
+            }
+            override fun onNothingSelected(p0: AdapterView<*>?) {}
+        }
+    }
+
+    private fun updateEnhanceSpinner() {
+        // Find the active engine or show "None"
+        var activeIdx = 0
+        for (i in 0 until engineCount) {
+            if (enhanceSelected[i]) {
+                activeIdx = i + 1  // Spinner index = engine index + 1 (for "None" at 0)
+                break
+            }
+        }
+        enhanceSpinner.setSelection(activeIdx, false)
+    }
+
     // --- Enhance control (borrowed from FFTT02M, extended to mixed-mode checkboxes) ---
     // Indices 0..3 are the mutually-exclusive engines that build the base map (shown as radio
     // buttons); indices 4..8 are post-processors (denoise filters + Multitaper) that stack on top
@@ -301,11 +344,20 @@ class ViewerActivity : AppCompatActivity() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(pad, pad / 2, pad, 0)
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+            )
         }
 
         // Engines: one exclusive choice (radio), with an explicit "None" = plain STFT.
         root.addView(enhanceHeader("Engine (pick one)"))
-        val engineGroup = RadioGroup(this)
+        val engineGroup = RadioGroup(this).apply {
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
         val noneId = View.generateViewId()
         engineGroup.addView(RadioButton(this).apply { id = noneId; text = "None (plain STFT)" })
         val engineIds = IntArray(engineCount)
@@ -323,14 +375,29 @@ class ViewerActivity : AppCompatActivity() {
         root.addView(enhanceHeader("Post-processors (stack)"))
         val postBoxes = ArrayList<Pair<Int, CheckBox>>()
         for (i in engineCount until enhanceModeNames.size) {
-            val cb = CheckBox(this).apply { text = enhanceModeNames[i]; isChecked = enhanceSelected[i] }
+            val cb = CheckBox(this).apply { 
+                text = enhanceModeNames[i]
+                isChecked = enhanceSelected[i]
+                layoutParams = android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            }
             root.addView(cb)
             postBoxes.add(i to cb)
         }
 
+        val scrollView = ScrollView(this).apply {
+            layoutParams = android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT
+            )
+            addView(root)
+        }
+
         androidx.appcompat.app.AlertDialog.Builder(this)
             .setTitle("Enhance")
-            .setView(ScrollView(this).apply { addView(root) })
+            .setView(scrollView)
             .setPositiveButton("Apply") { _, _ ->
                 for (i in 0 until engineCount) enhanceSelected[i] = (engineIds[i] == engineGroup.checkedRadioButtonId)
                 for ((i, cb) in postBoxes) enhanceSelected[i] = cb.isChecked
@@ -395,7 +462,7 @@ class ViewerActivity : AppCompatActivity() {
 
     private fun updateEnhanceButton() {
         val count = enhanceSelected.count { it }
-        btnSweep.text = if (count == 0) "ENHANCE" else "ENH:$count"
+        btnSweep.text = "Enhance:$count"
         btnSweep.backgroundTintList = android.content.res.ColorStateList.valueOf(
             if (count == 0) Color.parseColor("#FF69B4") else Color.RED
         )
@@ -404,6 +471,9 @@ class ViewerActivity : AppCompatActivity() {
         val engineActive = (0 until engineCount).any { enhanceSelected[it] }
         sizeSpinner.isEnabled = !engineActive
         stepSpinner.isEnabled = !engineActive
+
+        // Update the enhance spinner to match the button state
+        updateEnhanceSpinner()
     }
 
     /**
@@ -496,7 +566,7 @@ class ViewerActivity : AppCompatActivity() {
     private fun setupBlurSpinner() {
         val blurValues = (0..10).toList()
         val displayNames = blurValues.map { getString(R.string.label_blur, it) }
-        val adapter = ArrayAdapter(this, R.layout.spinner_item_blur, displayNames)
+        val adapter = ArrayAdapter(this, R.layout.spinner_item_blur_cyan, displayNames)
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         blurSpinner.adapter = adapter
         
@@ -517,7 +587,7 @@ class ViewerActivity : AppCompatActivity() {
     private fun setupFftSpinners() {
         // Size Spinner
         val sizeDisplayNames = fftValues.map { getString(R.string.fft_size_prefix, it) }
-        val sizeAdapter = ArrayAdapter(this, R.layout.spinner_item_small_gray, sizeDisplayNames)
+        val sizeAdapter = ArrayAdapter(this, R.layout.spinner_item_size_purple, sizeDisplayNames)
         sizeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         sizeSpinner.adapter = sizeAdapter
         val savedSizeIdx = prefs.getInt("fft_size_idx", 3).coerceIn(0, fftValues.size - 1)
@@ -552,7 +622,7 @@ class ViewerActivity : AppCompatActivity() {
         val finalSteps = if (validSteps.isEmpty()) listOf(selectedSize / 2) else validSteps
 
         val stepDisplayNames = finalSteps.map { getString(R.string.fft_step_prefix, it) }
-        val stepAdapter = ArrayAdapter(this, R.layout.spinner_item_small_darkgray, stepDisplayNames)
+        val stepAdapter = ArrayAdapter(this, R.layout.spinner_item_step_blue, stepDisplayNames)
         stepAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         
         // Important: preserve selection if possible, otherwise clamp

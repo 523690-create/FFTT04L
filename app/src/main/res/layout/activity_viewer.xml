@@ -276,55 +276,84 @@
         android:layout_height="0dp"
         android:orientation="vertical"
         android:paddingHorizontal="8dp"
+        android:paddingBottom="16dp"
         android:visibility="gone"
         app:layout_constraintTop_toBottomOf="@+id/viewerTabs"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
-        <Spinner
-            android:id="@+id/vSizeSpinner"
+        <ScrollView
             android:layout_width="match_parent"
-            android:layout_height="44dp"
-            android:layout_marginBottom="4dp"
-            android:layout_marginTop="4dp"
-            android:overlapAnchor="false" />
+            android:layout_height="match_parent"
+            android:clipToPadding="false">
 
-        <Spinner
-            android:id="@+id/vStepSpinner"
-            android:layout_width="match_parent"
-            android:layout_height="44dp"
-            android:layout_marginBottom="4dp"
-            android:background="@android:color/transparent"
-            android:overlapAnchor="false" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
 
-        <Button
-            android:id="@+id/btnViewerSweep"
-            android:layout_width="match_parent"
-            android:layout_height="44dp"
-            android:layout_marginBottom="4dp"
-            android:text="@string/sweep_off"
-            android:backgroundTint="#FF69B4"
-            android:textColor="#FFFFFF"
-            android:textSize="10sp"
-            android:textStyle="bold"
-            android:minWidth="0dp"
-            android:insetTop="0dp"
-            android:insetBottom="0dp" />
+                <Spinner
+                    android:id="@+id/vSizeSpinner"
+                    android:layout_width="match_parent"
+                    android:layout_height="44dp"
+                    android:layout_marginBottom="4dp"
+                    android:overlapAnchor="false" />
 
-        <Spinner
-            android:id="@+id/vColorSpinner"
-            android:layout_width="match_parent"
-            android:layout_height="44dp"
-            android:layout_marginBottom="4dp"
-            android:overlapAnchor="false" />
+                <Spinner
+                    android:id="@+id/vStepSpinner"
+                    android:layout_width="match_parent"
+                    android:layout_height="44dp"
+                    android:layout_marginBottom="4dp"
+                    android:overlapAnchor="false" />
 
-        <Spinner
-            android:id="@+id/vBlurSpinner"
-            android:layout_width="match_parent"
-            android:layout_height="44dp"
-            android:background="@android:color/transparent"
-            android:overlapAnchor="false" />
+                <Button
+                    android:id="@+id/btnViewerSweep"
+                    android:layout_width="match_parent"
+                    android:layout_height="44dp"
+                    android:layout_marginBottom="4dp"
+                    android:text="@string/sweep_off"
+                    android:backgroundTint="#FF69B4"
+                    android:textColor="#FFFFFF"
+                    android:textSize="10sp"
+                    android:textStyle="bold"
+                    android:minWidth="0dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp" />
+
+                <Spinner
+                    android:id="@+id/vEnhanceSpinner"
+                    android:layout_width="match_parent"
+                    android:layout_height="44dp"
+                    android:layout_marginBottom="4dp"
+                    android:overlapAnchor="false" />
+
+                <Spinner
+                    android:id="@+id/vColorSpinner"
+                    android:layout_width="match_parent"
+                    android:layout_height="44dp"
+                    android:layout_marginBottom="4dp"
+                    android:overlapAnchor="false" />
+
+                <Spinner
+                    android:id="@+id/vBlurSpinner"
+                    android:layout_width="match_parent"
+                    android:layout_height="44dp"
+                    android:layout_marginBottom="4dp"
+                    android:background="@android:color/transparent"
+                    android:overlapAnchor="false" />
+
+                <Spinner
+                    android:id="@+id/vColorSpinner"
+                    android:layout_width="match_parent"
+                    android:layout_height="44dp"
+                    android:layout_marginBottom="4dp"
+                    android:overlapAnchor="false" />
+
+            </LinearLayout>
+
+        </ScrollView>
+
     </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -12,6 +12,7 @@
         android:text="LATENCY MEASUREMENT"
         android:textColor="#FFFFFF"
         android:textSize="20sp"
+        android:textStyle="bold"
         android:layout_gravity="center_horizontal"
         android:layout_marginBottom="24dp"/>
 
