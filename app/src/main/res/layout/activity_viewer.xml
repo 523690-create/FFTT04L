@@ -269,7 +269,7 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- ===== Page 2: DISPLAY ===== -->
+    <!-- ===== Page 2: DISPLAY (all controls stacked vertically) ===== -->
     <LinearLayout
         android:id="@+id/pageDisplay"
         android:layout_width="0dp"
@@ -282,23 +282,47 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
-        <LinearLayout
+        <Spinner
+            android:id="@+id/vSizeSpinner"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="8dp"
+            android:layout_height="44dp"
+            android:layout_marginBottom="4dp"
             android:layout_marginTop="4dp"
-            android:weightSum="3">
-            <Spinner android:id="@+id/vSizeSpinner" android:layout_width="0dp" android:layout_height="44dp" android:layout_weight="1" android:layout_marginEnd="4dp" android:overlapAnchor="false" />
-            <Spinner android:id="@+id/vStepSpinner" android:layout_width="0dp" android:layout_height="44dp" android:layout_weight="1" android:layout_marginEnd="4dp" android:background="@android:color/transparent" android:overlapAnchor="false" />
-            <Button android:id="@+id/btnViewerSweep" android:layout_width="0dp" android:layout_height="44dp" android:layout_weight="1" android:text="@string/sweep_off" android:backgroundTint="#FF69B4" android:textColor="#FFFFFF" android:textSize="10sp" android:textStyle="bold" android:minWidth="0dp" android:insetTop="0dp" android:insetBottom="0dp" />
-        </LinearLayout>
+            android:overlapAnchor="false" />
+
+        <Spinner
+            android:id="@+id/vStepSpinner"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:layout_marginBottom="4dp"
+            android:background="@android:color/transparent"
+            android:overlapAnchor="false" />
+
+        <Button
+            android:id="@+id/btnViewerSweep"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:layout_marginBottom="4dp"
+            android:text="@string/sweep_off"
+            android:backgroundTint="#FF69B4"
+            android:textColor="#FFFFFF"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:minWidth="0dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp" />
+
+        <Spinner
+            android:id="@+id/vColorSpinner"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:layout_marginBottom="4dp"
+            android:overlapAnchor="false" />
 
         <Spinner
             android:id="@+id/vBlurSpinner"
             android:layout_width="match_parent"
             android:layout_height="44dp"
-            android:layout_marginBottom="8dp"
             android:background="@android:color/transparent"
             android:overlapAnchor="false" />
     </LinearLayout>
