@@ -99,6 +99,13 @@ class ViewerActivity : AppCompatActivity() {
         setupControls()
 
         viewerFft.post {
+            // Restore this recording's saved pan/zoom, and persist it whenever the user changes it.
+            viewerFft.setViewState(
+                prefs.getFloat("view_zoom_x", 1f), prefs.getFloat("view_zoom_y", 1f),
+                prefs.getFloat("view_off_x", 0f), prefs.getFloat("view_off_y", 0f)
+            )
+            viewerFft.onViewStateChanged = { saveViewTransform() }
+
             filePath?.let { path ->
                 loadAndDecode(File(path))
             }
@@ -106,6 +113,14 @@ class ViewerActivity : AppCompatActivity() {
             findViewById<android.view.View>(android.R.id.content).post {
                 updateAllLabelPositions()
             }
+        }
+    }
+
+    private fun saveViewTransform() {
+        val s = viewerFft.getViewState()
+        prefs.edit {
+            putFloat("view_zoom_x", s[0]); putFloat("view_zoom_y", s[1])
+            putFloat("view_off_x", s[2]); putFloat("view_off_y", s[3])
         }
     }
 

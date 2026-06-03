@@ -53,6 +53,22 @@ class FFTHeatMapView @JvmOverloads constructor(
     private var offsetX = 0f
     private var offsetY = 0f
 
+    /** Invoked when the user finishes a pan/zoom gesture, so the host can persist the view state. */
+    var onViewStateChanged: (() -> Unit)? = null
+
+    /** Current pan/zoom as [zoomX, zoomY, offsetX, offsetY] — used to persist per-recording view. */
+    fun getViewState(): FloatArray = floatArrayOf(zoomFactorX, zoomFactorY, offsetX, offsetY)
+
+    /** Restore a previously saved pan/zoom. Offsets are clamped to the current view bounds. */
+    fun setViewState(zx: Float, zy: Float, ox: Float, oy: Float) {
+        zoomFactorX = zx.coerceIn(1f, 10f)
+        zoomFactorY = zy.coerceIn(1f, 10f)
+        offsetX = ox
+        offsetY = oy
+        if (width > 0 && height > 0) checkOffsets()
+        invalidate()
+    }
+
     private val scaleDetector = ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
         override fun onScale(detector: ScaleGestureDetector): Boolean {
             val oldZoomX = zoomFactorX
@@ -335,6 +351,7 @@ class FFTHeatMapView @JvmOverloads constructor(
                 }
                 MotionEvent.ACTION_UP -> {
                     performClick()
+                    onViewStateChanged?.invoke()
                 }
             }
         }
