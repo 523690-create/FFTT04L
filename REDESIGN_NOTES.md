@@ -14,6 +14,54 @@ commit per change**, so non-optimal changes can be reverted selectively with
 
 ## Changelog (newest first)
 
+### Tabbed control panels (Viewer + Wavelet, portrait + landscape)
+- What: All controls are reachable via a Material `TabLayout` that shows one control group at a time
+  (lowest-risk approach: reuse the existing control views in place, toggle page visibility — no
+  ViewPager/fragments). Viewer tabs: **EQ / FILTER / DISPLAY**. Wavelet tabs: **SETUP / SLIDERS**.
+  Selected tab is persisted per recording; slider value labels are repositioned when their page is
+  shown. Landscape was rebuilt from the old stripped-down stubs into a tabbed left sidebar beside the
+  square map, so landscape now exposes the full control set too; ViewerActivity wires colour/filter/
+  blur/enhance in both orientations (the `!isLandscape` gate is gone). `R.id.sliderColor` declared in
+  `ids.xml` to survive removal of the old landscape stub.
+- Files: `ViewerActivity.kt`, `WaveletActivity.kt`, all four `activity_viewer/activity_wavelet`
+  layouts (portrait + `layout-land`), `res/values/ids.xml`
+- Revert: `git revert` the four "tabbed" commits (portrait viewer, portrait wavelet, landscape).
+
+### Responsive fonts (uniform text autosizing)
+- What: `applyAutoSizeText` (ViewUtils.kt) walks each screen's view tree and enables uniform text
+  autosizing on every TextView/Button so captions scale to fit across device sizes/orientations. The
+  hand-positioned slider value labels (inside slider FrameLayouts, sized at runtime) and TabLayout
+  subtrees are skipped. Wired into Main/Viewer/Wavelet onCreate and the Gallery item holder.
+- Files: `ViewUtils.kt`, `ViewerActivity.kt`, `WaveletActivity.kt`, `MainActivity.kt`, `GalleryActivity.kt`
+- Revert: `git revert` the commit "Responsive fonts: uniform text autosizing across all screens".
+
+### Listen screen: persist mic device globally
+- What: The Listen screen already persisted colour/EQ/noise globally; the selected microphone now
+  persists too (saved by display name, restored before the spinner listener attaches to avoid a
+  spurious recording restart).
+- Files: `MainActivity.kt`
+- Revert: `git revert` the commit "Listen screen: persist mic device selection globally".
+
+### Persist FFT pan/zoom per recording; WAVE -> WAVELET caption
+- What: `FFTHeatMapView` exposes get/setViewState + an onViewStateChanged callback (fires when a
+  pan/zoom gesture ends). ViewerActivity restores the saved pan/zoom from the per-recording prefs on
+  load and writes it back on change. Also renamed the `btn_wave` caption WAVE -> WAVELET.
+- Files: `ViewerActivity.kt`, `FFTHeatMapView.kt`, `res/values/strings.xml`
+- Revert: `git revert` the commit "Persist FFT pan/zoom per recording; rename WAVE button to WAVELET".
+
+### True Multitaper engine (replaces the post-processor approximation)
+- What: The old Multitaper post-processor could only smooth a finished map; replaced with a real
+  PCM engine (`runMultitaperInternal`) that averages K=5 orthogonal sine-tapered (Riedel-Sidorenko)
+  periodograms per column, cutting spectral-estimate variance at the window's true resolution.
+  Multitaper is now the 5th engine (radio, index 4); post-processors shift to 5..8; `engineCount=5`;
+  enhance pref key bumped to `enhance_mask_v3`.
+- Files: `ViewerActivity.kt`
+- Revert: `git revert` the commit "Replace Multitaper post-processor with a true PCM multitaper engine".
+
+### FFT Enhance dialog: engines as radio buttons, post-processors as checkboxes
+- (see commit) Custom dialog with a RadioGroup for the mutually-exclusive engines (+ "None") and
+  checkboxes for the stacking post-processors. Files: `ViewerActivity.kt`.
+
 ### Persist analysis & display settings per recording
 - What: ViewerActivity and WaveletActivity now key their `SharedPreferences` to the recording
   filename (`rec_<sanitised-name>`) instead of the shared `app_settings`, so each recording
