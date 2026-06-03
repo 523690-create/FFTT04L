@@ -427,12 +427,24 @@ class MainActivity : AppCompatActivity() {
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         spinner.adapter = adapter
 
+        // Restore the globally-persisted mic choice before attaching the listener, so re-selecting it
+        // doesn't trigger a spurious restart (selectedDevice already matches).
+        val savedName = prefs.getString("mic_device", null)
+        if (savedName != null) {
+            val idx = deviceNames.indexOf(savedName)
+            if (idx >= 0) {
+                selectedDevice = devices[idx]
+                spinner.setSelection(idx)
+            }
+        }
+
         spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
                 if (isCalibrating) return
                 val newDevice = devices[position]
                 if (newDevice != selectedDevice) {
                     selectedDevice = newDevice
+                    prefs.edit { putString("mic_device", deviceNames[position]) }
                     restartRecording()
                 }
             }
