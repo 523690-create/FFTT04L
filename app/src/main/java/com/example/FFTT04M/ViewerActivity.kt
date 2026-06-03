@@ -57,9 +57,16 @@ class ViewerActivity : AppCompatActivity() {
     private var noiseFilterStrength = 0f
     private var noiseRiseCoeff = 0.015f
     private var noiseFallCoeff = 0.05f
-    private var isSweepActive = false
-    private val enhanceModeNames = arrayOf("Sweep", "Gaussian", "Bilateral", "TV Denoise", "Butterworth", "Sweep+")
+    // Enhance modes. Indices 0..3 are mutually-exclusive *engines* (each builds the base map);
+    // when several are checked the highest-priority one wins (Synchrosqueeze > Reassignment >
+    // Constant-Q > Sweep+). Indices 4..8 are *post-processors* that stack, in order, on top of
+    // whichever engine ran (or on the plain STFT when no engine is selected).
+    private val enhanceModeNames = arrayOf(
+        "Sweep+", "Constant-Q", "Reassignment", "Synchrosqueeze",
+        "Gaussian", "Bilateral", "TV Denoise", "Butterworth", "Multitaper"
+    )
     private val enhanceSelected = BooleanArray(enhanceModeNames.size)
+    private val engineCount = 4
 
     private val refreshLock = Any()
     private var refreshCount = 0
@@ -159,9 +166,6 @@ class ViewerActivity : AppCompatActivity() {
             viewerFft.setColorScheme(savedColorScheme)
             val savedBlur = prefs.getInt("blur_radius", 0).coerceIn(0, 10)
             viewerFft.setBlur(savedBlur)
-            
-            // Sweep is always off in land
-            isSweepActive = false
         }
         
         setupEqSliders()
@@ -206,13 +210,14 @@ class ViewerActivity : AppCompatActivity() {
     }
 
     // --- Enhance control (borrowed from FFTT02M, extended to mixed-mode checkboxes) ---
-    // Index 0 = "Sweep" (FFTT04M's own multi-resolution sweep); indices 1..4 are denoise
-    // post-filters applied in sequence to the spectrogram.
+    // Indices 0..3 pick the engine that builds the base map; indices 4..8 are post-processors
+    // (denoise filters + Multitaper) applied in sequence on top of the engine output.
 
     private fun setupEnhanceButton() {
-        val mask = prefs.getInt("enhance_mask", 0)
+        // "_v2" key: the mode list was reordered when the simple Sweep engine was dropped, so any
+        // old saved mask would map to the wrong modes. Start fresh under a new key.
+        val mask = prefs.getInt("enhance_mask_v2", 0)
         for (i in enhanceSelected.indices) enhanceSelected[i] = (mask shr i) and 1 == 1
-        isSweepActive = enhanceSelected[0]
         updateEnhanceButton()
         btnSweep.setOnClickListener {
             val working = enhanceSelected.copyOf()
@@ -225,8 +230,7 @@ class ViewerActivity : AppCompatActivity() {
                     working.copyInto(enhanceSelected)
                     var m = 0
                     for (i in enhanceSelected.indices) if (enhanceSelected[i]) m = m or (1 shl i)
-                    prefs.edit { putInt("enhance_mask", m) }
-                    isSweepActive = enhanceSelected[0]
+                    prefs.edit { putInt("enhance_mask_v2", m) }
                     updateEnhanceButton()
                     triggerRefresh()
                 }
@@ -241,21 +245,24 @@ class ViewerActivity : AppCompatActivity() {
         btnSweep.backgroundTintList = android.content.res.ColorStateList.valueOf(
             if (count == 0) Color.parseColor("#FF69B4") else Color.RED
         )
-        // Sweep recomputes FFT sizes itself, so lock the size/step spinners while it is active.
-        sizeSpinner.isEnabled = !enhanceSelected[0]
-        stepSpinner.isEnabled = !enhanceSelected[0]
+        // Every engine recomputes its own FFT sizing, so lock the size/step spinners (which only
+        // drive the plain STFT path) whenever any engine is selected.
+        val engineActive = (0 until engineCount).any { enhanceSelected[it] }
+        sizeSpinner.isEnabled = !engineActive
+        stepSpinner.isEnabled = !engineActive
     }
 
     /**
-     * Mixed-mode spectrogram enhancement. Applies each selected denoise filter (indices 1..4)
-     * in sequence. Index 0 ("Sweep") is handled upstream by runFftSweepInternal.
+     * Mixed-mode spectrogram enhancement. Applies each selected post-processor (indices 4..8) in
+     * sequence on top of whichever engine produced the input map.
      */
     private fun applyEnhancements(input: Array<FloatArray>): Array<FloatArray> {
         var data = input
-        if (enhanceSelected.getOrElse(1) { false }) data = enhGaussian(data)
-        if (enhanceSelected.getOrElse(2) { false }) data = enhBilateral(data)
-        if (enhanceSelected.getOrElse(3) { false }) data = enhTvDenoise(data)
-        if (enhanceSelected.getOrElse(4) { false }) data = enhButterworth(data)
+        if (enhanceSelected.getOrElse(4) { false }) data = enhGaussian(data)
+        if (enhanceSelected.getOrElse(5) { false }) data = enhBilateral(data)
+        if (enhanceSelected.getOrElse(6) { false }) data = enhTvDenoise(data)
+        if (enhanceSelected.getOrElse(7) { false }) data = enhButterworth(data)
+        if (enhanceSelected.getOrElse(8) { false }) data = enhMultitaper(data)
         return data
     }
 
@@ -329,6 +336,31 @@ class ViewerActivity : AppCompatActivity() {
             val prevR = if (r > 0) result[r - 1][c] else history[r][c]
             val prevC = if (c > 0) result[r][c - 1] else history[r][c]
             result[r][c] = history[r][c] * alpha + (prevR + prevC) * (1f - alpha) / 2f
+        }
+        return result
+    }
+
+    /**
+     * Multitaper-style post-processor. True multitapering averages periodograms from several
+     * orthogonal (Slepian) tapers to cut spectral-estimate variance; operating on an already-built
+     * magnitude map we can't re-taper the raw signal, so we emulate the variance reduction with a
+     * short binomial average along the frequency axis - the dominant smoothing direction of a
+     * multitaper estimate. Honest approximation, isolated like the others.
+     */
+    private fun enhMultitaper(history: Array<FloatArray>): Array<FloatArray> {
+        val rows = history.size
+        if (rows == 0) return history
+        val cols = history[0].size
+        val result = Array(rows) { FloatArray(cols) }
+        val w = floatArrayOf(1f, 4f, 6f, 4f, 1f)
+        val wsum = 16f
+        for (r in 0 until rows) for (c in 0 until cols) {
+            var sum = 0f
+            for (j in -2..2) {
+                val cc = (c + j).coerceIn(0, cols - 1)
+                sum += history[r][cc] * w[j + 2]
+            }
+            result[r][c] = sum / wsum
         }
         return result
     }
@@ -459,9 +491,15 @@ class ViewerActivity : AppCompatActivity() {
             }
 
             try {
-                if (enhanceSelected.getOrElse(5) { false }) runSweepPlusInternal(currentRefresh)
-                else if (isSweepActive) runFftSweepInternal(currentRefresh)
-                else refreshFftInternal(currentRefresh)
+                // Engine priority: highest-priority selected engine wins. Each is isolated, so a
+                // failure inside one is caught here and leaves the rest of the app untouched.
+                when {
+                    enhanceSelected.getOrElse(3) { false } -> runSynchrosqueezeInternal(currentRefresh)
+                    enhanceSelected.getOrElse(2) { false } -> runReassignmentInternal(currentRefresh)
+                    enhanceSelected.getOrElse(1) { false } -> runConstantQInternal(currentRefresh)
+                    enhanceSelected.getOrElse(0) { false } -> runSweepPlusInternal(currentRefresh)
+                    else -> refreshFftInternal(currentRefresh)
+                }
             } catch (e: InterruptedException) {
                 // Task cancelled
             } catch (e: Exception) {
@@ -719,126 +757,6 @@ class ViewerActivity : AppCompatActivity() {
         }
     }
 
-    private fun runFftSweepInternal(refreshId: Int) {
-        val pcm = rawPcmData ?: return
-        val viewHeight = viewerFft.height
-        if (viewHeight <= 0) {
-            viewerFft.post { triggerRefresh() }
-            return
-        }
-
-        val sweepSizes = intArrayOf(512, 1024, 2048, 4096)
-        val sweepSteps = intArrayOf(256, 512, 1024, 2048, 4096)
-        
-        val baseStep = 256
-        val baseSize = 512
-        var baseHistory = 0
-        var tempOffset = 0
-        while (tempOffset + baseSize <= pcm.size) {
-            baseHistory++
-            tempOffset += baseStep
-        }
-        if (baseHistory <= 0) return
-
-        val accumulationBuffer = Array(baseHistory) { FloatArray(viewHeight) }
-        
-        // Filter PCM
-        for (f in filters) f.reset()
-        val filteredPcm = FloatArray(pcm.size)
-        for (i in pcm.indices) {
-            if (Thread.interrupted() || refreshId < refreshCount) throw InterruptedException()
-            var s = pcm[i]
-            for (f in filters) s = f.process(s)
-            filteredPcm[i] = s
-        }
-
-        val minFreq = 80f
-        val maxFreq = 10000f
-        val logMin = log10(minFreq)
-        val logMax = log10(maxFreq)
-        
-        var globalMax = 1e-9f
-
-        for (size in sweepSizes) {
-            if (size > filteredPcm.size) continue
-            val hannWindow = FloatArray(size) { i -> 
-                (0.5f * (1 - cos(2 * PI * i / (size - 1)))).toFloat() 
-            }
-            
-            // Precalculate bin mapping for this resolution
-            val mapping = IntArray(viewHeight) { y ->
-                val logF = logMax - (y.toFloat() / viewHeight) * (logMax - logMin)
-                val freq = 10.0.pow(logF.toDouble()).toFloat()
-                (freq * size / sampleRate).toInt().coerceIn(0, size / 2 - 1)
-            }
-
-            for (step in sweepSteps) {
-                if (step > size) continue
-                
-                val noiseFloor = FloatArray(size / 2)
-                var offset = 0
-                while (offset + size <= filteredPcm.size) {
-                    if (Thread.interrupted() || refreshId < refreshCount) throw InterruptedException()
-                    val c = offset / baseStep
-                    if (c >= baseHistory) break
-
-                    val real = FloatArray(size)
-                    val imag = FloatArray(size)
-                    for (i in 0 until size) {
-                        real[i] = filteredPcm[offset + i] * hannWindow[i]
-                    }
-                    FFTUtils.compute(real, imag)
-                    
-                    val mags = FloatArray(size / 2)
-                    for (i in 0 until size / 2) {
-                        var mag = sqrt(real[i] * real[i] + imag[i] * imag[i])
-                        if (noiseFilterStrength > 0f) {
-                            if (noiseFloor[i] == 0f) noiseFloor[i] = mag
-                            else if (mag < noiseFloor[i]) noiseFloor[i] = noiseFloor[i] * (1f - noiseFallCoeff) + mag * noiseFallCoeff
-                            else noiseFloor[i] = noiseFloor[i] * (1f - noiseRiseCoeff) + mag * noiseRiseCoeff
-                            mag = (mag - noiseFloor[i] * noiseFilterStrength).coerceAtLeast(0f)
-                        }
-                        mags[i] = mag
-                    }
-
-                    for (y in 0 until viewHeight) {
-                        val mag = mags[mapping[y]]
-                        accumulationBuffer[c][y] += mag
-                        if (accumulationBuffer[c][y] > globalMax) globalMax = accumulationBuffer[c][y]
-                    }
-                    
-                    offset += step
-                }
-            }
-        }
-
-        runOnUiThread {
-            if (isFinishing || isDestroyed) return@runOnUiThread
-            viewerFft.setParams(baseSize, sampleRate.toFloat(), baseStep)
-            viewerFft.setMaxHistory(baseHistory)
-            viewerFft.clearHistory()
-            viewerFft.isFrozen = true
-        }
-        
-        val processed = applyEnhancements(accumulationBuffer)
-        var enhMax = 1e-9f
-        for (col in processed) for (v in col) if (v > enhMax) enhMax = v
-        val maxDB = 20 * log10(enhMax + 1e-9f)
-        for (c in 0 until baseHistory) {
-            if (Thread.interrupted() || refreshId < refreshCount) throw InterruptedException()
-            val normalized = FloatArray(viewHeight)
-            for (y in 0 until viewHeight) {
-                val dB = 20 * log10(processed[c][y] + 1e-9f)
-                normalized[y] = ((dB - (maxDB - 80)) / 80f).coerceIn(0f, 1f)
-            }
-            runOnUiThread {
-                if (!isFinishing && !isDestroyed) {
-                    viewerFft.updateFFT(normalized, force = true)
-                }
-            }
-        }
-    }
-
     /**
      * Sweep+ : de-striped multi-resolution map. Each window size is computed on the common base
      * time grid, normalized to its own peak, then merged across sizes by per-pixel max - so no
@@ -930,6 +848,285 @@ class ViewerActivity : AppCompatActivity() {
                 if (!isFinishing && !isDestroyed) viewerFft.updateFFT(normalized, force = true)
             }
         }
+    }
+
+    // ---- Shared engine helpers (Constant-Q / Reassignment / Synchrosqueeze) ----
+
+    private val engineMinFreq = 80f
+    private val engineMaxFreq = 10000f
+
+    /** Apply the EQ biquads to a fresh copy of the PCM, exactly as the other engines do. */
+    private fun filterPcm(pcm: FloatArray, refreshId: Int): FloatArray {
+        for (f in filters) f.reset()
+        val out = FloatArray(pcm.size)
+        for (i in pcm.indices) {
+            if (Thread.interrupted() || refreshId < refreshCount) throw InterruptedException()
+            var s = pcm[i]
+            for (f in filters) s = f.process(s)
+            out[i] = s
+        }
+        return out
+    }
+
+    /** Map a frequency (Hz) onto the log-frequency view axis; -1 if it falls outside the view. */
+    private fun freqToRow(freq: Float, viewHeight: Int): Int {
+        if (freq <= 0f) return -1
+        val logMin = log10(engineMinFreq)
+        val logMax = log10(engineMaxFreq)
+        val y = (((logMax - log10(freq)) / (logMax - logMin)) * viewHeight).roundToInt()
+        return if (y in 0 until viewHeight) y else -1
+    }
+
+    /**
+     * Shared engine tail: stream a [baseHistory][viewHeight] magnitude map to the heat-map view.
+     * Stacks the selected post-processors, converts to dB across an 80 dB window, and pushes
+     * columns - the same finishing path the Sweep+/STFT engines use, factored out for reuse.
+     */
+    private fun renderEngineMap(refreshId: Int, baseSize: Int, baseStep: Int, map: Array<FloatArray>) {
+        val baseHistory = map.size
+        if (baseHistory == 0) return
+        val viewHeight = map[0].size
+        runOnUiThread {
+            if (isFinishing || isDestroyed) return@runOnUiThread
+            viewerFft.setParams(baseSize, sampleRate.toFloat(), baseStep)
+            viewerFft.setMaxHistory(baseHistory)
+            viewerFft.clearHistory()
+            viewerFft.isFrozen = true
+        }
+        val processed = applyEnhancements(map)
+        var enhMax = 1e-9f
+        for (col in processed) for (v in col) if (v > enhMax) enhMax = v
+        val maxDB = 20 * log10(enhMax + 1e-9f)
+        for (c in 0 until baseHistory) {
+            if (Thread.interrupted() || refreshId < refreshCount) throw InterruptedException()
+            val normalized = FloatArray(viewHeight)
+            for (y in 0 until viewHeight) {
+                val dB = 20 * log10(processed[c][y] + 1e-9f)
+                normalized[y] = ((dB - (maxDB - 80)) / 80f).coerceIn(0f, 1f)
+            }
+            runOnUiThread {
+                if (!isFinishing && !isDestroyed) viewerFft.updateFFT(normalized, force = true)
+            }
+        }
+    }
+
+    /**
+     * Constant-Q / Morlet engine. For each row of the log-frequency axis the signal is convolved
+     * with a complex Morlet wavelet whose Gaussian support scales as 1/f (fixed cycle count => fixed
+     * Q), sampled on the common base time grid. Because the analysis frequencies are themselves
+     * log-spaced, the result lands directly on the view's axis with no additive banding. Isolated.
+     */
+    private fun runConstantQInternal(refreshId: Int) {
+        val pcm = rawPcmData ?: return
+        val viewHeight = viewerFft.height
+        if (viewHeight <= 0) { viewerFft.post { triggerRefresh() }; return }
+
+        val baseStep = 256
+        val baseSize = 512
+        var baseHistory = 0
+        var t = 0
+        while (t + baseSize <= pcm.size) { baseHistory++; t += baseStep }
+        if (baseHistory <= 0) return
+
+        val filtered = filterPcm(pcm, refreshId)
+        val sr = sampleRate.toFloat()
+        val logMin = log10(engineMinFreq)
+        val logMax = log10(engineMaxFreq)
+
+        val nCycles = 7f          // wavelet cycle count -> Q
+        val maxHalf = 4096        // cap the low-frequency wavelet half-length so it stays tractable
+        val combined = Array(baseHistory) { FloatArray(viewHeight) }
+
+        for (y in 0 until viewHeight) {
+            if (Thread.interrupted() || refreshId < refreshCount) throw InterruptedException()
+            val logF = logMax - (y.toFloat() / viewHeight) * (logMax - logMin)
+            val freq = 10.0.pow(logF.toDouble()).toFloat()
+            val sigma = (nCycles / (2f * PI.toFloat() * freq)) * sr   // Gaussian std, in samples
+            val half = min((3.5f * sigma).toInt(), maxHalf)
+            if (half < 1) continue
+            val len = 2 * half + 1
+            val cosK = FloatArray(len)
+            val sinK = FloatArray(len)
+            val w = 2.0 * PI * freq / sr
+            val inv2s2 = 1f / (2f * sigma * sigma)
+            var enorm = 0f
+            for (k in -half..half) {
+                val idx = k + half
+                val e = exp(-(k.toFloat() * k) * inv2s2)
+                enorm += e
+                cosK[idx] = (cos(w * k)).toFloat() * e
+                sinK[idx] = (sin(w * k)).toFloat() * e
+            }
+            val inv = if (enorm > 0f) 1f / enorm else 1f   // normalize so scales are comparable
+            for (c in 0 until baseHistory) {
+                val center = c * baseStep + baseSize / 2
+                var re = 0f
+                var im = 0f
+                var k = -half
+                while (k <= half) {
+                    val s = center + k
+                    if (s in filtered.indices) {
+                        val x = filtered[s]
+                        val idx = k + half
+                        re += x * cosK[idx]
+                        im += x * sinK[idx]
+                    }
+                    k++
+                }
+                combined[c][y] = sqrt(re * re + im * im) * inv
+            }
+        }
+
+        renderEngineMap(refreshId, baseSize, baseStep, combined)
+    }
+
+    /**
+     * Reassignment engine (Auger-Flandrin). A Hann STFT is sharpened by relocating each bin's
+     * energy to the local centre of gravity in *both* time and frequency, estimated from the
+     * time-ramped window (group delay) and the derivative window (instantaneous frequency). Energy
+     * is splatted onto the base grid. Isolated; a failure here is caught by the dispatch.
+     */
+    private fun runReassignmentInternal(refreshId: Int) {
+        val pcm = rawPcmData ?: return
+        val viewHeight = viewerFft.height
+        if (viewHeight <= 0) { viewerFft.post { triggerRefresh() }; return }
+
+        val size = 2048
+        val baseStep = 256
+        val baseSize = 512
+        if (size > pcm.size) return
+        var baseHistory = 0
+        var t = 0
+        while (t + baseSize <= pcm.size) { baseHistory++; t += baseStep }
+        if (baseHistory <= 0) return
+
+        val filtered = filterPcm(pcm, refreshId)
+        val sr = sampleRate.toFloat()
+
+        // Hann (h), time-ramped (Th, centred index) and derivative (Dh) windows.
+        val h = FloatArray(size)
+        val th = FloatArray(size)
+        val dh = FloatArray(size)
+        val step = 2.0 * PI / (size - 1)
+        val mid = (size - 1) / 2.0
+        for (n in 0 until size) {
+            val hn = (0.5 * (1 - cos(step * n))).toFloat()
+            h[n] = hn
+            th[n] = ((n - mid).toFloat()) * hn
+            dh[n] = (0.5 * step * sin(step * n)).toFloat()
+        }
+
+        val combined = Array(baseHistory) { FloatArray(viewHeight) }
+        val halfBins = size / 2
+        val binToBin = (size / (2.0 * PI)).toFloat()
+
+        var offset = 0
+        var col = 0
+        while (offset + size <= filtered.size && col < baseHistory) {
+            if (Thread.interrupted() || refreshId < refreshCount) throw InterruptedException()
+            val rH = FloatArray(size); val iH = FloatArray(size)
+            val rT = FloatArray(size); val iT = FloatArray(size)
+            val rD = FloatArray(size); val iD = FloatArray(size)
+            for (n in 0 until size) {
+                val x = filtered[offset + n]
+                rH[n] = x * h[n]
+                rT[n] = x * th[n]
+                rD[n] = x * dh[n]
+            }
+            FFTUtils.compute(rH, iH)
+            FFTUtils.compute(rT, iT)
+            FFTUtils.compute(rD, iD)
+
+            val frameCenter = offset + mid
+            for (k in 0 until halfBins) {
+                val hr = rH[k]; val hi = iH[k]
+                val power = hr * hr + hi * hi
+                if (power < 1e-12f) continue
+                // Time offset (samples): -Re(X_Th * conj(X_h)) / |X_h|²
+                val dt = -((rT[k] * hr + iT[k] * hi) / power)
+                // Freq offset (bins): -Im(X_Dh * conj(X_h)) / |X_h|² * N/(2π)
+                val dBin = -((iD[k] * hr - rD[k] * hi) / power) * binToBin
+
+                val reBin = k + dBin
+                if (reBin < 0f || reBin > halfBins) continue
+                val row = freqToRow(reBin * sr / size, viewHeight)
+                if (row < 0) continue
+                val rc = ((frameCenter + dt) / baseStep).roundToInt()
+                if (rc < 0 || rc >= baseHistory) continue
+                combined[rc][row] += power
+            }
+            offset += baseStep
+            col++
+        }
+
+        // Power -> magnitude for the shared dB tail.
+        for (c in 0 until baseHistory) for (y in 0 until viewHeight) combined[c][y] = sqrt(combined[c][y])
+        renderEngineMap(refreshId, baseSize, baseStep, combined)
+    }
+
+    /**
+     * Synchrosqueeze engine. Like reassignment, but energy is moved only along frequency (the time
+     * column is preserved), using the instantaneous-frequency estimate from the derivative window.
+     * This yields a sharp ridge map that stays faithful in time. Isolated.
+     */
+    private fun runSynchrosqueezeInternal(refreshId: Int) {
+        val pcm = rawPcmData ?: return
+        val viewHeight = viewerFft.height
+        if (viewHeight <= 0) { viewerFft.post { triggerRefresh() }; return }
+
+        val size = 2048
+        val baseStep = 256
+        val baseSize = 512
+        if (size > pcm.size) return
+        var baseHistory = 0
+        var t = 0
+        while (t + baseSize <= pcm.size) { baseHistory++; t += baseStep }
+        if (baseHistory <= 0) return
+
+        val filtered = filterPcm(pcm, refreshId)
+        val sr = sampleRate.toFloat()
+
+        val h = FloatArray(size)
+        val dh = FloatArray(size)
+        val step = 2.0 * PI / (size - 1)
+        for (n in 0 until size) {
+            h[n] = (0.5 * (1 - cos(step * n))).toFloat()
+            dh[n] = (0.5 * step * sin(step * n)).toFloat()
+        }
+
+        val combined = Array(baseHistory) { FloatArray(viewHeight) }
+        val halfBins = size / 2
+        val binToBin = (size / (2.0 * PI)).toFloat()
+
+        var offset = 0
+        var col = 0
+        while (offset + size <= filtered.size && col < baseHistory) {
+            if (Thread.interrupted() || refreshId < refreshCount) throw InterruptedException()
+            val rH = FloatArray(size); val iH = FloatArray(size)
+            val rD = FloatArray(size); val iD = FloatArray(size)
+            for (n in 0 until size) {
+                val x = filtered[offset + n]
+                rH[n] = x * h[n]
+                rD[n] = x * dh[n]
+            }
+            FFTUtils.compute(rH, iH)
+            FFTUtils.compute(rD, iD)
+
+            for (k in 0 until halfBins) {
+                val hr = rH[k]; val hi = iH[k]
+                val power = hr * hr + hi * hi
+                if (power < 1e-12f) continue
+                val reBin = k - ((iD[k] * hr - rD[k] * hi) / power) * binToBin
+                if (reBin < 0f || reBin > halfBins) continue
+                val row = freqToRow(reBin * sr / size, viewHeight)
+                if (row < 0) continue
+                combined[col][row] += sqrt(power)
+            }
+            offset += baseStep
+            col++
+        }
+
+        renderEngineMap(refreshId, baseSize, baseStep, combined)
     }
 
     private fun playAudio() {

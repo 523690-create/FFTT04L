@@ -7,10 +7,34 @@ commit per change**, so non-optimal changes can be reverted selectively with
 ## Conventions
 - Each new visualization option is an **isolated Enhance mode** wrapped in try/catch —
   if it fails it's just an inert menu entry and the rest of the app is unaffected.
-- Engine modes (build the base spectrogram): Sweep, Sweep+, Constant-Q/Morlet, Reassignment, Synchrosqueeze.
-  If two engines are selected, the highest-priority one wins. Post-processors (denoise, Multitaper) stack on top.
+- Engine modes (build the base spectrogram): Sweep+, Constant-Q/Morlet, Reassignment, Synchrosqueeze.
+  If two engines are selected, the highest-priority one wins (priority: Synchrosqueeze > Reassignment
+  > Constant-Q > Sweep+). Post-processors (Gaussian, Bilateral, TV Denoise, Butterworth, Multitaper)
+  stack on top. The original additive "Sweep" engine has been removed (see changelog).
 
 ## Changelog (newest first)
+
+### Constant-Q/Morlet, Reassignment & Synchrosqueeze engines + Multitaper; drop simple Sweep
+- What: Completed the planned engine set. The Enhance dialog now exposes four mutually-exclusive
+  engines — **Sweep+** (idx 0), **Constant-Q** (idx 1), **Reassignment** (idx 2), **Synchrosqueeze**
+  (idx 3) — and five stacking post-processors — Gaussian/Bilateral/TV Denoise/Butterworth (idx 4–7)
+  plus the new **Multitaper** (idx 8). The original additive **Sweep** engine (and its
+  `runFftSweepInternal`) was deleted; its index-0 menu slot is now Sweep+.
+  - Constant-Q (`runConstantQInternal`): per-row complex Morlet wavelet (fixed cycle count → fixed Q),
+    convolved on the base time grid; analysis freqs are log-spaced so they land on the view axis directly.
+  - Reassignment (`runReassignmentInternal`): Auger-Flandrin time+freq reassignment of a Hann STFT
+    using time-ramped and derivative windows; energy splatted onto the base grid.
+  - Synchrosqueeze (`runSynchrosqueezeInternal`): frequency-only reassignment (time column preserved)
+    via the derivative-window instantaneous-frequency estimate.
+  - Multitaper (`enhMultitaper`): variance-reducing binomial average along the frequency axis. Note:
+    it's a post-processor on the finished map, so it *emulates* multitaper variance reduction rather
+    than re-tapering raw PCM (documented in-code).
+  - Dispatch: engine priority Synchrosqueeze > Reassignment > Constant-Q > Sweep+, else plain STFT.
+    Each engine is isolated — the dispatch `try/catch` contains any failure. Shared tail factored into
+    `renderEngineMap`/`filterPcm`/`freqToRow`. The `enhance_mask` pref key was bumped to
+    `enhance_mask_v2` because the mode order changed.
+- Files: `ViewerActivity.kt`
+- Revert: `git revert` the commit titled "Add Constant-Q/Reassignment/Synchrosqueeze engines + Multitaper; drop Sweep".
 
 ### Sweep+ (de-striped multi-resolution) — Enhance mode
 - What: New Enhance engine "Sweep+" (mode index 5). Computes each window size
