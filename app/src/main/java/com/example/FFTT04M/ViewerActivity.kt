@@ -215,6 +215,35 @@ class ViewerActivity : AppCompatActivity() {
         }
         
         setupEqSliders()
+        setupViewerTabs()
+    }
+
+    /**
+     * Tabbed control panel: one TabLayout switches which control group (EQ / FILTER / DISPLAY) is
+     * visible, reusing the existing control views. Null-guarded so the (stub-only) landscape layout
+     * that lacks the tabs is unaffected. The selected tab is persisted per recording.
+     */
+    private fun setupViewerTabs() {
+        val tabs = findViewById<com.google.android.material.tabs.TabLayout?>(R.id.viewerTabs) ?: return
+        val pages = listOf<View?>(
+            findViewById(R.id.pageEq), findViewById(R.id.pageFilter), findViewById(R.id.pageDisplay)
+        )
+        fun show(index: Int) {
+            pages.forEachIndexed { i, p -> p?.visibility = if (i == index) View.VISIBLE else View.GONE }
+            // Slider value labels can only be placed once their page has a real size.
+            findViewById<View>(android.R.id.content).post { updateAllLabelPositions() }
+        }
+        tabs.addOnTabSelectedListener(object : com.google.android.material.tabs.TabLayout.OnTabSelectedListener {
+            override fun onTabSelected(tab: com.google.android.material.tabs.TabLayout.Tab) {
+                show(tab.position)
+                prefs.edit { putInt("viewer_tab", tab.position) }
+            }
+            override fun onTabUnselected(tab: com.google.android.material.tabs.TabLayout.Tab) {}
+            override fun onTabReselected(tab: com.google.android.material.tabs.TabLayout.Tab) {}
+        })
+        val initial = prefs.getInt("viewer_tab", 0).coerceIn(0, tabs.tabCount - 1)
+        tabs.getTabAt(initial)?.select()
+        show(initial)
     }
 
     private fun setupColorSpinner() {
