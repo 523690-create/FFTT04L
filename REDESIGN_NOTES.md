@@ -53,3 +53,4 @@ commit per change**, so non-optimal changes can be reverted selectively with
 - Revert: `git revert` the commit titled "Add Play cursor (playhead synced to audio)".
 
 ### wish list
+ - redesign UI
