@@ -65,6 +65,14 @@ class WaveletActivity : AppCompatActivity() {
 
     private lateinit var prefs: SharedPreferences
 
+    companion object {
+        private const val MAX_CWT_SAMPLES = 60000L            // CWT buffer-size ceiling
+        private const val MAX_DWT_SAMPLES = 300000L           // DWT buffer-size ceiling
+        private const val MEM_BUDGET_BYTES = 40L * 1024 * 1024 // heap budget for coefficient buffers
+        private const val MIN_SAMPLING_FREQ = 1000f           // matches sliderSampling valueFrom
+        private const val MIN_LEVEL = 1                       // matches sliderLevel valueFrom
+    }
+
     private val filterMap = mapOf(
         0 to mapOf( // Daubechies
             2 to floatArrayOf(0.4829629f, 0.8365163f, 0.22414387f, -0.12940952f),
@@ -252,36 +260,75 @@ class WaveletActivity : AppCompatActivity() {
         updateUIFromSettings()
     }
 
-    private fun resetToSafeSettings(reason: String) {
-        isStopRequested = true
-        isCWT = false
-        targetFreq = 11000f
-        decompositionLevel = 3
-        isWPT = false
-        isReconstruct = false
-        threshold = 0.01f
-        
-        runOnUiThread {
-            checkCWT.isChecked = false
-            checkWPT.isChecked = false
-            checkReconstruct.isChecked = false
-            sliderSampling.setSafeValue(11000f)
-            sliderLevel.setSafeValue(3f)
-            sliderThreshold.setSafeValue(0.01f)
-            
-            updateUIFromSettings()
-            Toast.makeText(this, "Safe mode active: $reason", Toast.LENGTH_LONG).show()
-            
-            prefs.edit {
-                putBoolean("cwt", false)
-                putBoolean("wpt", false)
-                putBoolean("reconstruct", false)
-                putFloat("freq", 11000f)
-                putInt("level", 3)
-                putFloat("threshold", 0.01f)
+    /**
+     * Largest sampling frequency whose resampled buffer still fits the size + memory budgets for the
+     * currently-selected mode/level. Used to *trim the Sampling slider* rather than disable features.
+     */
+    private fun safeFreqCeiling(): Float {
+        val pcm = pcmData ?: return targetFreq
+        if (pcm.isEmpty()) return MIN_SAMPLING_FREQ
+        val maxBySize = if (isCWT) MAX_CWT_SAMPLES else MAX_DWT_SAMPLES
+        val perSampleBytes = if (isCWT) 100L * 4 else (decompositionLevel + 1).toLong() * 4
+        val maxByMem = (MEM_BUDGET_BYTES * 9 / 10) / perSampleBytes   // 90% of budget for headroom
+        val maxResampled = min(maxBySize, maxByMem)
+        return (maxResampled.toFloat() * originalSampleRate) / pcm.size
+    }
+
+    /**
+     * One escalation step of the graduated failsafe. Gentlest first:
+     *   1. trim the Sampling-frequency slider toward a value that fits (jump to the safe ceiling on
+     *      a predicted over-budget, or step down 25% on an unpredicted runtime crash);
+     *   2. then lower the Decomposition-level slider (the dominant cost for WPT's 2^level fan-out);
+     *   3. and only as a *last resort* uncheck the most expensive engine (CWT > WPT > Reconstruct).
+     * Returns true if a setting was changed (caller should re-run), false if nothing is left to trim.
+     */
+    private fun degradeForSafety(): Boolean {
+        val pcm = pcmData ?: return false
+        if (pcm.isEmpty()) return false
+
+        // 1) Sampling frequency.
+        if (targetFreq > MIN_SAMPLING_FREQ) {
+            val ceiling = safeFreqCeiling()
+            val newFreq = max(MIN_SAMPLING_FREQ, min(ceiling, targetFreq * 0.75f))
+            if (newFreq < targetFreq - 0.5f) {
+                targetFreq = floor(newFreq)
+                prefs.edit { putFloat("freq", targetFreq) }
+                return true
             }
-            
-            runDwt()
+        }
+
+        // 2) Decomposition level.
+        if (decompositionLevel > MIN_LEVEL) {
+            decompositionLevel -= 1
+            prefs.edit { putInt("level", decompositionLevel) }
+            return true
+        }
+
+        // 3) Last resort: disable the heaviest active engine.
+        when {
+            isCWT -> { isCWT = false; prefs.edit { putBoolean("cwt", false) } }
+            isWPT -> { isWPT = false; prefs.edit { putBoolean("wpt", false) } }
+            isReconstruct -> { isReconstruct = false; prefs.edit { putBoolean("reconstruct", false) } }
+            else -> return false
+        }
+        return true
+    }
+
+    /**
+     * Entry point for every failsafe trigger (predicted over-budget or an actual runtime crash).
+     * Backs off one graduated step and retries; if nothing can be backed off further, stops cleanly.
+     */
+    private fun applyFailsafe(reason: String) {
+        runOnUiThread {
+            isStopRequested = true
+            if (degradeForSafety()) {
+                updateUIFromSettings()
+                Toast.makeText(this, "Eased settings to avoid crash: $reason", Toast.LENGTH_SHORT).show()
+                runDwt()
+            } else {
+                waveletView.setCalculating(false)
+                Toast.makeText(this, "Cannot run safely even at minimum settings: $reason", Toast.LENGTH_LONG).show()
+            }
         }
     }
 
@@ -319,29 +366,21 @@ class WaveletActivity : AppCompatActivity() {
 
     private fun validateConstraints(): Boolean {
         val pcm = pcmData ?: return false
-        
-        val originalCount = pcm.size
-        val resampledSize = (originalCount * (targetFreq / originalSampleRate)).toInt()
-        
-        if (isCWT) {
-            if (resampledSize > 60000) {
-                resetToSafeSettings("Buffer too large for CWT ($resampledSize samples). Downsampling recommended. Max 60k for CWT.")
-                return false
-            }
-        } else {
-            if (resampledSize > 300000) {
-                resetToSafeSettings("Buffer too large for DWT ($resampledSize samples). Max 300k for DWT.")
-                return false
-            }
+
+        val resampledSize = (pcm.size * (targetFreq / originalSampleRate)).toInt()
+        val maxSamples = if (isCWT) MAX_CWT_SAMPLES else MAX_DWT_SAMPLES
+        if (resampledSize > maxSamples) {
+            applyFailsafe("buffer ${resampledSize} samples over the ${maxSamples} ${if (isCWT) "CWT" else "DWT"} limit")
+            return false
         }
-        
-        // Memory safety: approx check
-        val estMemory = if (isCWT) resampledSize.toLong() * 100 * 4 else resampledSize.toLong() * (decompositionLevel + 1) * 4
-        if (estMemory > 40 * 1024 * 1024) { // 40MB limit for heap safety
-             resetToSafeSettings("Estimated memory usage too high (${estMemory/1024/1024}MB).")
-             return false
+
+        val estMemory = if (isCWT) resampledSize.toLong() * 100 * 4
+                        else resampledSize.toLong() * (decompositionLevel + 1) * 4
+        if (estMemory > MEM_BUDGET_BYTES) {
+            applyFailsafe("estimated ${estMemory / 1024 / 1024} MB over the ${MEM_BUDGET_BYTES / 1024 / 1024} MB budget")
+            return false
         }
-        
+
         return true
     }
 
@@ -606,11 +645,13 @@ class WaveletActivity : AppCompatActivity() {
                         }
                     }
                 }
-            } catch (e: Exception) { 
+            } catch (e: Exception) {
                 e.printStackTrace()
-                runOnUiThread { 
-                    resetToSafeSettings("Decode error: ${e.message}")
-                    Toast.makeText(this, "Decode error: ${e.message}", Toast.LENGTH_SHORT).show() 
+                // A decode failure can't be fixed by easing analysis settings (there's no PCM to
+                // retry), so just report it rather than running the back-off.
+                runOnUiThread {
+                    waveletView.setCalculating(false)
+                    Toast.makeText(this, "Decode error: ${e.message}", Toast.LENGTH_LONG).show()
                 }
             } finally {
                 try {
@@ -640,7 +681,7 @@ class WaveletActivity : AppCompatActivity() {
                     }
                 } catch (e: Throwable) {
                     if (requestId == currentRequestId) {
-                        runOnUiThread { resetToSafeSettings("CWT Failure: ${e.message}") }
+                        applyFailsafe("CWT failure: ${e.message}")
                     }
                 }
             }.start()
@@ -717,7 +758,7 @@ class WaveletActivity : AppCompatActivity() {
                     }
                 }
             } catch (e: Exception) {
-                runOnUiThread { resetToSafeSettings("DWT error: ${e.message}") }
+                applyFailsafe("DWT error: ${e.message}")
             }
         }.start()
     }
@@ -729,14 +770,14 @@ class WaveletActivity : AppCompatActivity() {
         
         // Final safety check for CWT memory usage
         if (n > 60000) {
-            runOnUiThread { resetToSafeSettings("Buffer too large for CWT: $n samples. Max 60k.") }
+            applyFailsafe("CWT buffer $n samples over the 60k limit")
             return
         }
 
         val paddedSize = try {
             FFTUtils.nextPowerOfTwo(n)
         } catch (e: Exception) {
-            runOnUiThread { resetToSafeSettings("Buffer error: ${e.message}") }
+            applyFailsafe("buffer error: ${e.message}")
             return
         }
         
@@ -744,7 +785,7 @@ class WaveletActivity : AppCompatActivity() {
         val sigIm = try { FloatArray(paddedSize) } catch (e: OutOfMemoryError) { null }
         
         if (sigRe == null || sigIm == null) {
-            runOnUiThread { resetToSafeSettings("Memory error: CWT requires too much RAM") }
+            applyFailsafe("out of memory allocating CWT signal buffers")
             return
         }
 
@@ -762,7 +803,7 @@ class WaveletActivity : AppCompatActivity() {
         val wavIm = try { FloatArray(paddedSize) } catch (e: OutOfMemoryError) { null }
         
         if (wavRe == null || wavIm == null) {
-            runOnUiThread { resetToSafeSettings("Memory error: Scaling buffers failed") }
+            applyFailsafe("out of memory allocating CWT scaling buffers")
             return
         }
 
@@ -810,7 +851,7 @@ class WaveletActivity : AppCompatActivity() {
                 }
             }
         } catch (e: Exception) {
-            runOnUiThread { resetToSafeSettings("CWT error: ${e.message}") }
+            applyFailsafe("CWT error: ${e.message}")
             return
         }
         
@@ -886,7 +927,7 @@ class WaveletActivity : AppCompatActivity() {
                 runOnUiThread { waveletView.setCalculating(calculating = true) }
                 runReconstructInternal(data, h, g, requestId)
             } catch (e: Exception) {
-                runOnUiThread { resetToSafeSettings("Reconstruct error: ${e.message}") }
+                applyFailsafe("reconstruct error: ${e.message}")
             }
         }.start()
     }
