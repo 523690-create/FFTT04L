@@ -72,16 +72,15 @@ class ViewerActivity : AppCompatActivity() {
     private var noiseFilterStrength = 0f
     private var noiseRiseCoeff = 0.015f
     private var noiseFallCoeff = 0.05f
-    // Enhance modes. Indices 0..3 are mutually-exclusive *engines* (each builds the base map);
-    // when several are checked the highest-priority one wins (Synchrosqueeze > Reassignment >
-    // Constant-Q > Sweep+). Indices 4..8 are *post-processors* that stack, in order, on top of
+    // Enhance modes. Indices 0..4 are the mutually-exclusive *engines* that build the base map
+    // (shown as radio buttons). Indices 5..8 are *post-processors* that stack, in order, on top of
     // whichever engine ran (or on the plain STFT when no engine is selected).
     private val enhanceModeNames = arrayOf(
-        "Sweep+", "Constant-Q", "Reassignment", "Synchrosqueeze",
-        "Gaussian", "Bilateral", "TV Denoise", "Butterworth", "Multitaper"
+        "Sweep+", "Constant-Q", "Reassignment", "Synchrosqueeze", "Multitaper",
+        "Gaussian", "Bilateral", "TV Denoise", "Butterworth"
     )
     private val enhanceSelected = BooleanArray(enhanceModeNames.size)
-    private val engineCount = 4
+    private val engineCount = 5
 
     private val refreshLock = Any()
     private var refreshCount = 0
@@ -246,9 +245,9 @@ class ViewerActivity : AppCompatActivity() {
     // of the engine output (shown as checkboxes).
 
     private fun setupEnhanceButton() {
-        // "_v2" key: the mode list was reordered when the simple Sweep engine was dropped, so any
-        // old saved mask would map to the wrong modes. Start fresh under a new key.
-        val mask = prefs.getInt("enhance_mask_v2", 0)
+        // "_v3" key: the mode list was reordered again when Multitaper became a 5th engine, so any
+        // older saved mask would map to the wrong modes. Start fresh under a new key.
+        val mask = prefs.getInt("enhance_mask_v3", 0)
         for (i in enhanceSelected.indices) enhanceSelected[i] = (mask shr i) and 1 == 1
         // Safety: only one engine may be active. If a stale mask has several, keep the highest-priority.
         var seenEngine = false
@@ -302,7 +301,7 @@ class ViewerActivity : AppCompatActivity() {
                 for ((i, cb) in postBoxes) enhanceSelected[i] = cb.isChecked
                 var m = 0
                 for (i in enhanceSelected.indices) if (enhanceSelected[i]) m = m or (1 shl i)
-                prefs.edit { putInt("enhance_mask_v2", m) }
+                prefs.edit { putInt("enhance_mask_v3", m) }
                 updateEnhanceButton()
                 triggerRefresh()
             }
@@ -373,16 +372,15 @@ class ViewerActivity : AppCompatActivity() {
     }
 
     /**
-     * Mixed-mode spectrogram enhancement. Applies each selected post-processor (indices 4..8) in
+     * Mixed-mode spectrogram enhancement. Applies each selected post-processor (indices 5..8) in
      * sequence on top of whichever engine produced the input map.
      */
     private fun applyEnhancements(input: Array<FloatArray>): Array<FloatArray> {
         var data = input
-        if (enhanceSelected.getOrElse(4) { false }) data = enhGaussian(data)
-        if (enhanceSelected.getOrElse(5) { false }) data = enhBilateral(data)
-        if (enhanceSelected.getOrElse(6) { false }) data = enhTvDenoise(data)
-        if (enhanceSelected.getOrElse(7) { false }) data = enhButterworth(data)
-        if (enhanceSelected.getOrElse(8) { false }) data = enhMultitaper(data)
+        if (enhanceSelected.getOrElse(5) { false }) data = enhGaussian(data)
+        if (enhanceSelected.getOrElse(6) { false }) data = enhBilateral(data)
+        if (enhanceSelected.getOrElse(7) { false }) data = enhTvDenoise(data)
+        if (enhanceSelected.getOrElse(8) { false }) data = enhButterworth(data)
         return data
     }
 
@@ -456,31 +454,6 @@ class ViewerActivity : AppCompatActivity() {
             val prevR = if (r > 0) result[r - 1][c] else history[r][c]
             val prevC = if (c > 0) result[r][c - 1] else history[r][c]
             result[r][c] = history[r][c] * alpha + (prevR + prevC) * (1f - alpha) / 2f
-        }
-        return result
-    }
-
-    /**
-     * Multitaper-style post-processor. True multitapering averages periodograms from several
-     * orthogonal (Slepian) tapers to cut spectral-estimate variance; operating on an already-built
-     * magnitude map we can't re-taper the raw signal, so we emulate the variance reduction with a
-     * short binomial average along the frequency axis - the dominant smoothing direction of a
-     * multitaper estimate. Honest approximation, isolated like the others.
-     */
-    private fun enhMultitaper(history: Array<FloatArray>): Array<FloatArray> {
-        val rows = history.size
-        if (rows == 0) return history
-        val cols = history[0].size
-        val result = Array(rows) { FloatArray(cols) }
-        val w = floatArrayOf(1f, 4f, 6f, 4f, 1f)
-        val wsum = 16f
-        for (r in 0 until rows) for (c in 0 until cols) {
-            var sum = 0f
-            for (j in -2..2) {
-                val cc = (c + j).coerceIn(0, cols - 1)
-                sum += history[r][cc] * w[j + 2]
-            }
-            result[r][c] = sum / wsum
         }
         return result
     }
@@ -629,6 +602,7 @@ class ViewerActivity : AppCompatActivity() {
                 // Engine priority: highest-priority selected engine wins. Each is isolated, so a
                 // failure inside one is caught here and leaves the rest of the app untouched.
                 when {
+                    enhanceSelected.getOrElse(4) { false } -> runMultitaperInternal(currentRefresh)
                     enhanceSelected.getOrElse(3) { false } -> runSynchrosqueezeInternal(currentRefresh)
                     enhanceSelected.getOrElse(2) { false } -> runReassignmentInternal(currentRefresh)
                     enhanceSelected.getOrElse(1) { false } -> runConstantQInternal(currentRefresh)
@@ -1268,9 +1242,66 @@ class ViewerActivity : AppCompatActivity() {
         renderEngineMap(refreshId, baseSize, baseStep, combined)
     }
 
+    /**
+     * Multitaper engine (Thomson). For each base column it computes K orthogonal sine-tapered
+     * periodograms of the same segment and averages their power, cutting spectral-estimate variance
+     * (a smoother, less speckly map) while keeping the true frequency resolution of the window.
+     * Sine tapers (Riedel-Sidorenko) approximate the DPSS/Slepian set but are cheap to generate.
+     * Operates on the raw PCM, isolated like the other engines.
+     */
+    private fun runMultitaperInternal(refreshId: Int) {
+        val pcm = rawPcmData ?: return
+        val viewHeight = viewerFft.height
+        if (viewHeight <= 0) { viewerFft.post { triggerRefresh() }; return }
+
+        val size = 1024
+        val baseStep = 256
+        val baseSize = 512
+        if (size > pcm.size) return
+        var baseHistory = 0
+        var t = 0
+        while (t + baseSize <= pcm.size) { baseHistory++; t += baseStep }
+        if (baseHistory <= 0) return
+
+        val filtered = filterPcm(pcm, refreshId)
+        val logMin = log10(engineMinFreq)
+        val logMax = log10(engineMaxFreq)
+        val half = size / 2
+        val mapping = IntArray(viewHeight) { y ->
+            val logF = logMax - (y.toFloat() / viewHeight) * (logMax - logMin)
+            val freq = 10.0.pow(logF.toDouble()).toFloat()
+            (freq * size / sampleRate).toInt().coerceIn(0, half - 1)
+        }
+
+        // K orthogonal sine tapers.
+        val k = 5
+        val tapers = Array(k) { j ->
+            FloatArray(size) { n -> (sqrt(2.0 / (size + 1)) * sin(PI * (j + 1) * (n + 1) / (size + 1))).toFloat() }
+        }
+
+        val combined = Array(baseHistory) { FloatArray(viewHeight) }
+        val invK = 1f / k
+        for (c in 0 until baseHistory) {
+            if (Thread.interrupted() || refreshId < refreshCount) throw InterruptedException()
+            val start = c * baseStep
+            if (start + size > filtered.size) break
+            val avgPow = FloatArray(half)
+            for (taper in tapers) {
+                val re = FloatArray(size)
+                val im = FloatArray(size)
+                for (n in 0 until size) re[n] = filtered[start + n] * taper[n]
+                FFTUtils.compute(re, im)
+                for (i in 0 until half) avgPow[i] += re[i] * re[i] + im[i] * im[i]
+            }
+            for (y in 0 until viewHeight) combined[c][y] = sqrt(avgPow[mapping[y]] * invK)
+        }
+
+        renderEngineMap(refreshId, baseSize, baseStep, combined)
+    }
+
     private fun playAudio() {
         val pcm = rawPcmData ?: return
-        
+
         // Stop any current playback
         stopAudio()
 
