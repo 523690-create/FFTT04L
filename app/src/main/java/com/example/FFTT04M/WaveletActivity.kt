@@ -555,7 +555,8 @@ class WaveletActivity : AppCompatActivity() {
             finish()
         }
 
-        findViewById<Button>(R.id.btnWaveletStop).setOnClickListener {
+        // STOP button is optional (portrait layouts removed it; stub exists in landscape)
+        findViewById<Button?>(R.id.btnWaveletStop)?.setOnClickListener {
             isStopRequested = true
         }
 

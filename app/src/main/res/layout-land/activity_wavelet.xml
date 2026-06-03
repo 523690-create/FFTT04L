@@ -33,9 +33,11 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginBottom="4dp">
+            android:layout_marginBottom="4dp"
+            android:weightSum="3">
             <Button android:id="@+id/btnWaveletGalleryTop" android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="1" android:layout_marginEnd="4dp" android:text="@string/btn_gallery" android:backgroundTint="#FFFF00" android:textColor="#000000" android:textSize="10sp" android:textStyle="bold" android:minWidth="0dp" style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
-            <Button android:id="@+id/btnWaveletListenTop" android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="1" android:text="LISTEN" android:backgroundTint="#00FFFF" android:textColor="#000000" android:textSize="10sp" android:textStyle="bold" android:minWidth="0dp" style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
+            <Button android:id="@+id/btnWaveletListenTop" android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="1" android:layout_marginEnd="4dp" android:text="LISTEN" android:backgroundTint="#00FFFF" android:textColor="#000000" android:textSize="10sp" android:textStyle="bold" android:minWidth="0dp" style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
+            <Spinner android:id="@+id/vColorSpinner" android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="1" android:overlapAnchor="false" />
         </LinearLayout>
 
         <com.google.android.material.tabs.TabLayout
@@ -99,8 +101,6 @@
                 android:layout_marginTop="4dp">
                 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="THRESH:" android:textColor="#AAAAAA" android:textSize="10sp" android:textStyle="bold" android:layout_marginEnd="6dp"/>
                 <CheckBox android:id="@+id/checkSoftThresh" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="SOFT" android:textColor="#FFFFFF" android:buttonTint="#FFFFFF" android:textSize="10sp" android:layout_marginEnd="10dp" />
-                <View android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1" />
-                <Button android:id="@+id/btnWaveletStop" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="STOP" android:backgroundTint="#FF0000" android:textColor="#FFFFFF" android:textSize="10sp" android:textStyle="bold" android:paddingHorizontal="8dp" android:minHeight="32dp" android:minWidth="0dp" />
             </LinearLayout>
 
             <LinearLayout
@@ -163,5 +163,8 @@
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>
+
+    <!-- Stub: btnWaveletStop removed from portrait UI but referenced in code -->
+    <View android:id="@+id/btnWaveletStop" android:layout_width="0dp" android:layout_height="0dp" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

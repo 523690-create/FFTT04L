@@ -46,24 +46,18 @@
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent">
 
+        <!-- Top controls: Gallery, Listen, Wavelet, Note, Play -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginBottom="4dp">
-            <Button android:id="@+id/btnViewerGalleryTop" android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="1" android:layout_marginEnd="3dp" android:text="@string/btn_gallery" android:backgroundTint="#FFFF00" android:textColor="#000000" android:textSize="9sp" android:textStyle="bold" android:minWidth="0dp" android:insetTop="0dp" android:insetBottom="0dp" style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
-            <Button android:id="@+id/btnViewerListenTop" android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="1" android:layout_marginEnd="3dp" android:text="LISTEN" android:backgroundTint="#00FFFF" android:textColor="#000000" android:textSize="9sp" android:textStyle="bold" android:minWidth="0dp" android:insetTop="0dp" android:insetBottom="0dp" style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
-            <Button android:id="@+id/btnViewerNote" android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="1" android:text="NOTE" android:backgroundTint="#FFFFFF" android:textColor="#000000" android:textSize="9sp" android:textStyle="bold" android:minWidth="0dp" android:insetTop="0dp" android:insetBottom="0dp" style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="4dp">
-            <Spinner android:id="@+id/vSizeSpinner" android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="1" android:background="@android:color/transparent" />
-            <Spinner android:id="@+id/vStepSpinner" android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="1" android:background="@android:color/transparent" />
-            <Button android:id="@+id/btnViewerSweep" android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="1" android:text="@string/sweep_off" android:backgroundTint="#FF69B4" android:textColor="#FFFFFF" android:textSize="9sp" android:textStyle="bold" android:minWidth="0dp" android:insetTop="0dp" android:insetBottom="0dp" style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
+            android:layout_marginBottom="4dp"
+            android:weightSum="5">
+            <Button android:id="@+id/btnViewerGalleryTop" android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="1" android:layout_marginEnd="2dp" android:text="@string/btn_gallery" android:backgroundTint="#FFFF00" android:textColor="#000000" android:textSize="9sp" android:textStyle="bold" android:minWidth="0dp" android:insetTop="0dp" android:insetBottom="0dp" style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
+            <Button android:id="@+id/btnViewerListenTop" android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="1" android:layout_marginEnd="2dp" android:text="LISTEN" android:backgroundTint="#00FFFF" android:textColor="#000000" android:textSize="9sp" android:textStyle="bold" android:minWidth="0dp" android:insetTop="0dp" android:insetBottom="0dp" style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
+            <Button android:id="@+id/btnViewerWavelet" android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="1" android:layout_marginEnd="2dp" android:text="@string/btn_wave" android:backgroundTint="#FFFF00" android:textColor="#000000" android:textSize="9sp" android:textStyle="bold" android:minWidth="0dp" android:insetTop="0dp" android:insetBottom="0dp" style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
+            <Button android:id="@+id/btnViewerNote" android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="1" android:layout_marginEnd="2dp" android:text="NOTE" android:backgroundTint="#FFFFFF" android:textColor="#000000" android:textSize="9sp" android:textStyle="bold" android:minWidth="0dp" android:insetTop="0dp" android:insetBottom="0dp" style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
+            <Button android:id="@+id/btnViewerPlay" android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="1" android:text="@string/btn_play" android:backgroundTint="#90EE90" android:textColor="#000000" android:textSize="9sp" android:textStyle="bold" android:minWidth="0dp" android:insetTop="0dp" android:insetBottom="0dp" style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
         </LinearLayout>
 
         <com.google.android.material.tabs.TabLayout
@@ -176,23 +170,34 @@
             </LinearLayout>
         </LinearLayout>
 
-        <!-- ===== Page 2: DISPLAY ===== -->
+        <!-- ===== Page 2: DISPLAY (Size, Step, Enhance, Blur) ===== -->
         <LinearLayout
             android:id="@+id/pageDisplay"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
             android:orientation="vertical"
-            android:visibility="gone"
-            android:gravity="center_vertical">
+            android:visibility="gone">
 
-            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginBottom="6dp">
-                <Button android:id="@+id/btnViewerPlay" android:layout_width="0dp" android:layout_height="44dp" android:layout_weight="1" android:layout_marginEnd="3dp" android:text="@string/btn_play" android:backgroundTint="#90EE90" android:textColor="#000000" android:textSize="10sp" android:textStyle="bold" android:minWidth="0dp" android:insetTop="0dp" android:insetBottom="0dp" />
-                <Button android:id="@+id/btnViewerWavelet" android:layout_width="0dp" android:layout_height="44dp" android:layout_weight="1" android:text="@string/btn_wave" android:backgroundTint="#FFFF00" android:textColor="#000000" android:textSize="10sp" android:textStyle="bold" android:minWidth="0dp" android:insetTop="0dp" android:insetBottom="0dp" />
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginBottom="4dp" android:weightSum="3">
+                <Spinner android:id="@+id/vSizeSpinner" android:layout_width="0dp" android:layout_height="44dp" android:layout_weight="1" android:layout_marginEnd="2dp" android:background="@android:color/transparent" />
+                <Spinner android:id="@+id/vStepSpinner" android:layout_width="0dp" android:layout_height="44dp" android:layout_weight="1" android:layout_marginEnd="2dp" android:background="@android:color/transparent" />
+                <Button android:id="@+id/btnViewerSweep" android:layout_width="0dp" android:layout_height="44dp" android:layout_weight="1" android:text="@string/sweep_off" android:backgroundTint="#FF69B4" android:textColor="#FFFFFF" android:textSize="9sp" android:textStyle="bold" android:minWidth="0dp" android:insetTop="0dp" android:insetBottom="0dp" />
             </LinearLayout>
 
-            <Spinner android:id="@+id/vColorSpinner" android:layout_width="match_parent" android:layout_height="44dp" android:layout_marginBottom="6dp" android:overlapAnchor="false" />
-            <Spinner android:id="@+id/vBlurSpinner" android:layout_width="match_parent" android:layout_height="44dp" android:background="@android:color/transparent" android:overlapAnchor="false" />
+            <Spinner
+                android:id="@+id/vColorSpinner"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginBottom="4dp"
+                android:overlapAnchor="false" />
+
+            <Spinner
+                android:id="@+id/vBlurSpinner"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:background="@android:color/transparent"
+                android:overlapAnchor="false" />
         </LinearLayout>
     </LinearLayout>
 
