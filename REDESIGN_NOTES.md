@@ -52,5 +52,8 @@ commit per change**, so non-optimal changes can be reverted selectively with
 - Files: `FFTHeatMapView.kt`, `ViewerActivity.kt`
 - Revert: `git revert` the commit titled "Add Play cursor (playhead synced to audio)".
 
-### wish list
- - redesign UI
+### wish list:
+- add a Comment button in analysis screens: the comment will appear immediately beneath the filename in the Gallery view. Any time Comment is changed and saved, replace the recording icon with the current 
+- Additionally, add progress indicator for all procedures taking more than 100 msec, and persist all analysis and display settings per recording.
+- make mutually exclusive enhance settings into radio buttons ratherthan checkboxes
+- 

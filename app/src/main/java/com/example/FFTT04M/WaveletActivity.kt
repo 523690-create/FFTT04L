@@ -25,21 +25,20 @@ class WaveletActivity : AppCompatActivity() {
     private lateinit var familySpinner: Spinner
     private lateinit var boundarySpinner: Spinner
     private lateinit var checkSoft: CheckBox
-    private lateinit var checkWPT: CheckBox
     private lateinit var checkLog: CheckBox
     private lateinit var checkLocalNorm: CheckBox
-    private lateinit var checkReconstruct: CheckBox
-    private lateinit var checkCWT: CheckBox
+    private lateinit var modeSpinner: Spinner
     private lateinit var sliderOrder: Slider
     private lateinit var sliderLevel: Slider
     private lateinit var sliderSampling: Slider
     private lateinit var sliderThreshold: Slider
     private lateinit var colorSpinner: Spinner
-    
+
     private lateinit var txtLevelValue: TextView
     private lateinit var txtOrderValue: TextView
     private lateinit var txtSamplingValue: TextView
     private lateinit var txtThresholdValue: TextView
+    private lateinit var txtSafetyStatus: TextView
 
     private var filePath: String? = null
     private var pcmData: FloatArray? = null
@@ -51,13 +50,22 @@ class WaveletActivity : AppCompatActivity() {
     private var selectedFamilyIdx = 0
     private var waveletOrder = 2
     private var isSoftThreshold = true
-    private var isWPT = false
     private var isLogScale = false
     private var isLocalNorm = false
-    private var isReconstruct = false
-    private var isCWT = false
     private var selectedBoundaryIdx = 0
     private var colorSchemeIdx = 0
+
+    // Analysis mode is a single exclusive choice (was three independent checkboxes). The legacy
+    // boolean flags below are derived from it via syncModeFlags(), so the downstream engine
+    // dispatch (which still reads isCWT/isReconstruct/isWPT) is unchanged.
+    private val modeNames = arrayOf("DWT", "WPT", "CWT", "RECON")
+    private var analysisMode = 0
+    private var isWPT = false
+    private var isReconstruct = false
+    private var isCWT = false
+
+    // Threshold is a 10-position log slider: index 0 = OFF, then log-spaced magnitudes.
+    private val thresholdSteps = floatArrayOf(0f, 0.001f, 0.002f, 0.005f, 0.01f, 0.02f, 0.05f, 0.1f, 0.2f, 0.5f)
 
     @Volatile
     private var isStopRequested = false
@@ -98,11 +106,9 @@ class WaveletActivity : AppCompatActivity() {
         familySpinner = findViewById(R.id.waveletFamilySpinner)
         boundarySpinner = findViewById(R.id.waveletBoundarySpinner)
         checkSoft = findViewById(R.id.checkSoftThresh)
-        checkWPT = findViewById(R.id.checkWPT)
         checkLog = findViewById(R.id.checkLogScale)
         checkLocalNorm = findViewById(R.id.checkLocalNorm)
-        checkReconstruct = findViewById(R.id.checkReconstruct)
-        checkCWT = findViewById(R.id.checkCWT)
+        modeSpinner = findViewById(R.id.waveletModeSpinner)
         sliderOrder = findViewById(R.id.sliderOrder)
         sliderLevel = findViewById(R.id.sliderLevel)
         sliderSampling = findViewById(R.id.sliderSampling)
@@ -113,6 +119,7 @@ class WaveletActivity : AppCompatActivity() {
         txtOrderValue = findViewById(R.id.txtOrderValue)
         txtSamplingValue = findViewById(R.id.txtSamplingValue)
         txtThresholdValue = findViewById(R.id.txtThresholdValue)
+        txtSafetyStatus = findViewById(R.id.txtSafetyStatus)
 
         prefs = getSharedPreferences("app_settings", MODE_PRIVATE)
         loadPrefs()
@@ -238,26 +245,69 @@ class WaveletActivity : AppCompatActivity() {
         }
     }
 
+    /** Keep the legacy engine flags in lockstep with the single analysisMode selection. */
+    private fun syncModeFlags() {
+        isWPT = analysisMode == 1
+        isCWT = analysisMode == 2
+        isReconstruct = analysisMode == 3
+    }
+
     private fun loadPrefs() {
         selectedFamilyIdx = prefs.getInt("family", 0)
         selectedBoundaryIdx = prefs.getInt("boundary", 0)
         isSoftThreshold = prefs.getBoolean("soft_thresh", true)
-        isWPT = prefs.getBoolean("wpt", false)
         isLogScale = prefs.getBoolean("log_scale", false)
         isLocalNorm = prefs.getBoolean("local_norm", false)
-        isReconstruct = prefs.getBoolean("reconstruct", false)
-        isCWT = prefs.getBoolean("cwt", false)
+
+        // Single mode selection; migrate from the old independent cwt/wpt/reconstruct booleans.
+        analysisMode = if (prefs.contains("analysis_mode")) {
+            prefs.getInt("analysis_mode", 0)
+        } else when {
+            prefs.getBoolean("cwt", false) -> 2
+            prefs.getBoolean("reconstruct", false) -> 3
+            prefs.getBoolean("wpt", false) -> 1
+            else -> 0
+        }
+        syncModeFlags()
+
         decompositionLevel = prefs.getInt("level", 4)
         waveletOrder = prefs.getInt("order", 2)
         targetFreq = prefs.getFloat("freq", 44100f)
-        
-        // Ensure threshold is read and rounded to step size
-        val savedThreshold = prefs.getFloat("threshold", 0.1f)
-        threshold = (round(savedThreshold / 0.001f) * 0.001f)
-        
+
+        // Snap the saved threshold onto one of the log slider positions.
+        threshold = thresholdSteps[thresholdToIndex(prefs.getFloat("threshold", 0.01f))]
+
         colorSchemeIdx = prefs.getInt("color_scheme", 0)
 
         updateUIFromSettings()
+    }
+
+    /** Nearest log-slider position for a threshold magnitude. */
+    private fun thresholdToIndex(t: Float): Int {
+        var best = 0
+        var bestD = Float.MAX_VALUE
+        for (i in thresholdSteps.indices) {
+            val d = abs(thresholdSteps[i] - t)
+            if (d < bestD) { bestD = d; best = i }
+        }
+        return best
+    }
+
+    private fun thresholdLabel(t: Float): String =
+        if (t <= 0f) "OFF" else String.format(java.util.Locale.US, "%.3f", t)
+
+    /** Refresh the safety status line: current mode + the largest sampling freq that fits. */
+    private fun updateSafetyStatus() {
+        val pcm = pcmData
+        if (pcm == null || pcm.isEmpty()) { txtSafetyStatus.text = ""; return }
+        val ceilingKhz = safeFreqCeiling() / 1000f
+        val over = targetFreq > safeFreqCeiling()
+        txtSafetyStatus.text = if (over) {
+            "⚠ ${modeNames[analysisMode]}: FS above safe ${String.format(java.util.Locale.US, "%.1f", ceilingKhz)} kHz — will auto-ease"
+        } else {
+            "${modeNames[analysisMode]} · safe FS ≤ ${String.format(java.util.Locale.US, "%.1f", ceilingKhz)} kHz"
+        }
+        txtSafetyStatus.setTextColor(if (over) Color.YELLOW else Color.LTGRAY)
     }
 
     /**
@@ -304,14 +354,14 @@ class WaveletActivity : AppCompatActivity() {
             return true
         }
 
-        // 3) Last resort: disable the heaviest active engine.
-        when {
-            isCWT -> { isCWT = false; prefs.edit { putBoolean("cwt", false) } }
-            isWPT -> { isWPT = false; prefs.edit { putBoolean("wpt", false) } }
-            isReconstruct -> { isReconstruct = false; prefs.edit { putBoolean("reconstruct", false) } }
-            else -> return false
+        // 3) Last resort: drop the (single) active engine back to plain DWT, the cheapest path.
+        if (analysisMode != 0) {
+            analysisMode = 0
+            syncModeFlags()
+            prefs.edit { putInt("analysis_mode", 0) }
+            return true
         }
-        return true
+        return false
     }
 
     /**
@@ -335,26 +385,24 @@ class WaveletActivity : AppCompatActivity() {
     private fun updateUIFromSettings() {
         familySpinner.setSelection(selectedFamilyIdx)
         boundarySpinner.setSelection(selectedBoundaryIdx)
+        modeSpinner.setSelection(analysisMode)
         checkSoft.isChecked = isSoftThreshold
-        checkWPT.isChecked = isWPT
         checkLog.isChecked = isLogScale
         checkLocalNorm.isChecked = isLocalNorm
-        checkReconstruct.isChecked = isReconstruct
-        checkCWT.isChecked = isCWT
-        
+
         // Use safe setters to prevent IllegalStateException
         sliderLevel.setSafeValue(decompositionLevel.toFloat())
         sliderOrder.setSafeValue(waveletOrder.toFloat())
         sliderSampling.setSafeValue(targetFreq)
-        sliderThreshold.setSafeValue(threshold)
-        
+        sliderThreshold.setSafeValue(thresholdToIndex(threshold).toFloat())
+
         txtLevelValue.text = decompositionLevel.toString()
         txtOrderValue.text = waveletOrder.toString()
         txtSamplingValue.text = if (targetFreq >= 1000) "${(targetFreq/1000).toInt()}\nkHz" else "${targetFreq.toInt()}\nHz"
-        txtThresholdValue.text = String.format(java.util.Locale.US, "%.3f", threshold)
+        txtThresholdValue.text = thresholdLabel(threshold)
 
         updateOrderSliderRange()
-        
+
         // Sync WaveletView state
         waveletView.setWPT(isWPT)
         waveletView.setLogScale(isLogScale)
@@ -362,6 +410,8 @@ class WaveletActivity : AppCompatActivity() {
         waveletView.setCwtMode(isCWT)
         waveletView.setColorScheme(colorSchemeIdx)
         waveletView.setSamplingFreq(targetFreq)
+
+        updateSafetyStatus()
     }
 
     private fun validateConstraints(): Boolean {
@@ -416,15 +466,30 @@ class WaveletActivity : AppCompatActivity() {
             override fun onNothingSelected(p0: AdapterView<*>?) {}
         }
 
+        // Analysis mode: one exclusive choice (DWT / WPT / CWT / RECON) replacing the old trio of
+        // independent checkboxes, which let users tick combinations the dispatch silently ignored.
+        val modeAdapter = ArrayAdapter(this, R.layout.spinner_item, modeNames)
+        modeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        modeSpinner.adapter = modeAdapter
+        modeSpinner.setSelection(analysisMode)
+        modeSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(p0: AdapterView<*>?, p1: View?, pos: Int, p3: Long) {
+                if (analysisMode != pos) {
+                    analysisMode = pos
+                    syncModeFlags()
+                    waveletView.setWPT(isWPT)
+                    waveletView.setCwtMode(isCWT)
+                    prefs.edit { putInt("analysis_mode", pos) }
+                    updateSafetyStatus()
+                    runDwt()
+                }
+            }
+            override fun onNothingSelected(p0: AdapterView<*>?) {}
+        }
+
         checkSoft.setOnCheckedChangeListener { _, isChecked ->
             isSoftThreshold = isChecked
             prefs.edit().putBoolean("soft_thresh", isChecked).apply()
-            runDwt()
-        }
-        checkWPT.setOnCheckedChangeListener { _, isChecked ->
-            isWPT = isChecked
-            waveletView.setWPT(isWPT)
-            prefs.edit().putBoolean("wpt", isWPT).apply()
             runDwt()
         }
         checkLog.setOnCheckedChangeListener { _, isChecked ->
@@ -436,17 +501,6 @@ class WaveletActivity : AppCompatActivity() {
             isLocalNorm = isChecked
             waveletView.setLocalNorm(isLocalNorm)
             prefs.edit().putBoolean("local_norm", isChecked).apply()
-        }
-        checkReconstruct.setOnCheckedChangeListener { _, isChecked ->
-            isReconstruct = isChecked
-            prefs.edit().putBoolean("reconstruct", isReconstruct).apply()
-            runDwt()
-        }
-        checkCWT.setOnCheckedChangeListener { _, isChecked ->
-            isCWT = isChecked
-            waveletView.setCwtMode(isCWT)
-            prefs.edit().putBoolean("cwt", isCWT).apply()
-            runDwt()
         }
 
         findViewById<Button>(R.id.btnWaveletGalleryTop).setOnClickListener {
@@ -490,14 +544,16 @@ class WaveletActivity : AppCompatActivity() {
                 txtSamplingValue.text = if (targetFreq >= 1000) "${(targetFreq/1000).toInt()}\nkHz" else "${targetFreq.toInt()}\nHz"
                 prefs.edit().putFloat("freq", targetFreq).apply()
                 updateLabelPosition(s, txtSamplingValue)
+                updateSafetyStatus()
                 runDwt()
             }
         }
         sliderThreshold.addOnChangeListener { s, value, fromUser ->
             if (fromUser) {
-                // Ensure value is a precise multiple of stepSize (0.001) to prevent slider validation crashes
-                threshold = (value * 1000f).roundToInt() / 1000f
-                txtThresholdValue.text = String.format(java.util.Locale.US, "%.3f", threshold)
+                // Slider holds a log-step index (0..9); map it to the actual threshold magnitude.
+                val idx = value.roundToInt().coerceIn(0, thresholdSteps.size - 1)
+                threshold = thresholdSteps[idx]
+                txtThresholdValue.text = thresholdLabel(threshold)
                 prefs.edit().putFloat("threshold", threshold).apply()
                 updateLabelPosition(s, txtThresholdValue)
                 runDwt()
@@ -667,8 +723,9 @@ class WaveletActivity : AppCompatActivity() {
 
     private fun runDwt() {
         val originalData = pcmData ?: return
+        updateSafetyStatus()
         if (!validateConstraints()) return
-        
+
         val requestId = ++currentRequestId
         isStopRequested = true
 

@@ -15,12 +15,10 @@
     <!-- Exhaustive stubs for WaveletActivity -->
     <Spinner android:id="@+id/waveletFamilySpinner" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
     <Spinner android:id="@+id/waveletBoundarySpinner" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
+    <Spinner android:id="@+id/waveletModeSpinner" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
     <CheckBox android:id="@+id/checkSoftThresh" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
-    <CheckBox android:id="@+id/checkWPT" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
     <CheckBox android:id="@+id/checkLogScale" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
     <CheckBox android:id="@+id/checkLocalNorm" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
-    <CheckBox android:id="@+id/checkReconstruct" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
-    <CheckBox android:id="@+id/checkCWT" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
 
     <com.google.android.material.slider.Slider android:id="@+id/sliderOrder" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
     <com.google.android.material.slider.Slider android:id="@+id/sliderLevel" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
@@ -34,6 +32,7 @@
     <TextView android:id="@+id/txtSamplingValue" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
     <TextView android:id="@+id/txtThresholdValue" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
     <TextView android:id="@+id/txtColorValue" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
+    <TextView android:id="@+id/txtSafetyStatus" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
 
     <!-- Map Area: Square 1:1, centered horizontally, full height -->
     <com.example.FFTT04M.WaveletView
