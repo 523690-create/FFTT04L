@@ -173,6 +173,18 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_weight="0.6" />
 
+    <ProgressBar
+        android:id="@+id/viewerProgress"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:visibility="gone"
+        android:elevation="8dp"
+        android:indeterminateTint="#FF69B4"
+        app:layout_constraintStart_toStartOf="@+id/viewerFft"
+        app:layout_constraintEnd_toEndOf="@+id/viewerFft"
+        app:layout_constraintTop_toTopOf="@+id/viewerFft"
+        app:layout_constraintBottom_toBottomOf="@+id/viewerFft" />
+
     <!-- Placeholder stubs -->
     <View android:id="@+id/gutter1" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" app:layout_constraintTop_toTopOf="parent" app:layout_constraintStart_toStartOf="parent"/>
     <View android:id="@+id/gutter2" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" app:layout_constraintTop_toTopOf="parent" app:layout_constraintStart_toStartOf="parent"/>

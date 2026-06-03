@@ -41,6 +41,13 @@ class ViewerActivity : AppCompatActivity() {
     private lateinit var colorSpinner: Spinner
     private lateinit var blurSpinner: Spinner
     private lateinit var btnSweep: Button
+    private var viewerProgress: android.widget.ProgressBar? = null
+
+    // Busy indicator shown only when a procedure runs longer than 100 ms (so quick refreshes don't
+    // flash a spinner). Reference-counted; every beginBusy() is paired with an endBusy() in a finally.
+    private val busyHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var busyCount = 0
+    private val busyShowRunnable = Runnable { if (busyCount > 0) viewerProgress?.visibility = View.VISIBLE }
 
     private var mediaPlayer: MediaPlayer? = null
     private var audioTrack: AudioTrack? = null
@@ -83,6 +90,7 @@ class ViewerActivity : AppCompatActivity() {
 
         prefs = getSharedPreferences("app_settings", Context.MODE_PRIVATE)
         viewerFft = findViewById(R.id.viewerFft)
+        viewerProgress = findViewById(R.id.viewerProgress)
         filePath = intent.getStringExtra("FILE_PATH")
 
         setupControls()
@@ -529,6 +537,20 @@ class ViewerActivity : AppCompatActivity() {
         }
     }
 
+    /** Schedule the busy spinner to appear in 100 ms; cancelled by endBusy() if work finishes first. */
+    private fun beginBusy() = runOnUiThread {
+        if (busyCount == 0) busyHandler.postDelayed(busyShowRunnable, 100)
+        busyCount++
+    }
+
+    private fun endBusy() = runOnUiThread {
+        busyCount = (busyCount - 1).coerceAtLeast(0)
+        if (busyCount == 0) {
+            busyHandler.removeCallbacks(busyShowRunnable)
+            viewerProgress?.visibility = View.GONE
+        }
+    }
+
     private fun triggerRefresh() {
         val currentRefresh = synchronized(refreshLock) {
             refreshCount++
@@ -543,6 +565,7 @@ class ViewerActivity : AppCompatActivity() {
             }
 
             try {
+                beginBusy()
                 // Engine priority: highest-priority selected engine wins. Each is isolated, so a
                 // failure inside one is caught here and leaves the rest of the app untouched.
                 when {
@@ -557,6 +580,7 @@ class ViewerActivity : AppCompatActivity() {
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
+                endBusy()
                 synchronized(refreshLock) {
                     if (activeThread == Thread.currentThread()) {
                         activeThread = null
@@ -642,6 +666,7 @@ class ViewerActivity : AppCompatActivity() {
 
     private fun loadAndDecode(file: File) {
         thread {
+            beginBusy()
             try {
                 val extractor = MediaExtractor()
                 extractor.setDataSource(file.absolutePath)
@@ -694,6 +719,8 @@ class ViewerActivity : AppCompatActivity() {
                 runOnUiThread { triggerRefresh() }
             } catch (e: Exception) {
                 e.printStackTrace()
+            } finally {
+                endBusy()
             }
         }
     }
