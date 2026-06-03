@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.media.AudioAttributes
+import android.media.AudioDeviceCallback
 import android.media.AudioDeviceInfo
 import android.media.AudioFormat
 import android.media.AudioManager
@@ -19,6 +20,8 @@ import android.content.res.ColorStateList
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.View
 import android.view.ViewTreeObserver
 import android.widget.AdapterView
@@ -27,6 +30,7 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.Spinner
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -80,6 +84,7 @@ class MainActivity : AppCompatActivity() {
 
     private var selectedDevice: AudioDeviceInfo? = null
     private var availableDevices = mutableListOf<AudioDeviceInfo>()
+    private var audioDeviceCallback: AudioDeviceCallback? = null
     private var isCalibrating = false
     @Volatile private var latestFrameEnergy = 0f
 
@@ -197,6 +202,7 @@ class MainActivity : AppCompatActivity() {
         val audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
         availableDevices = audioManager.getDevices(AudioManager.GET_DEVICES_INPUTS).toMutableList()
         setupMicSpinnerWithDevices(availableDevices)
+        registerDeviceCallback()
 
         selectedDevice?.let { dev ->
             val index = availableDevices.indexOf(dev)
@@ -657,9 +663,21 @@ class MainActivity : AppCompatActivity() {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) return
 
         val audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
+
+        // Drop a stale selection (e.g. a mic that disconnected while we weren't recording) so we
+        // never route to a dead device; null means "system default input".
+        selectedDevice?.let { sel ->
+            val stillConnected = audioManager.getDevices(AudioManager.GET_DEVICES_INPUTS).any { it.id == sel.id }
+            if (!stillConnected) selectedDevice = null
+        }
+
         if (selectedDevice?.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                audioManager.setCommunicationDevice(selectedDevice!!)
+                try {
+                    audioManager.setCommunicationDevice(selectedDevice!!)
+                } catch (e: Exception) {
+                    selectedDevice = null // SCO route unavailable; fall back to default
+                }
             }
         }
 
@@ -759,6 +777,42 @@ class MainActivity : AppCompatActivity() {
         startRecording()
     }
 
+    /**
+     * Failsafe for the persisted mic: watch for the selected input device disconnecting (USB pulled,
+     * Bluetooth dropped) and fall back to the system default so recording keeps working.
+     */
+    private fun registerDeviceCallback() {
+        if (audioDeviceCallback != null) return
+        val audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
+        val cb = object : AudioDeviceCallback() {
+            override fun onAudioDevicesRemoved(removed: Array<out AudioDeviceInfo>) {
+                val sel = selectedDevice ?: return
+                if (removed.any { it.id == sel.id }) handleMicDisconnected()
+            }
+        }
+        audioManager.registerAudioDeviceCallback(cb, Handler(Looper.getMainLooper()))
+        audioDeviceCallback = cb
+    }
+
+    private fun unregisterDeviceCallback() {
+        audioDeviceCallback?.let {
+            (getSystemService(AUDIO_SERVICE) as AudioManager).unregisterAudioDeviceCallback(it)
+        }
+        audioDeviceCallback = null
+    }
+
+    private fun handleMicDisconnected() {
+        val name = selectedDevice?.productName?.toString() ?: "the selected mic"
+        // Drop the dead device and stop persisting it, then fall back to the default input.
+        selectedDevice = null
+        prefs.edit { remove("mic_device") }
+        val audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
+        availableDevices = audioManager.getDevices(AudioManager.GET_DEVICES_INPUTS).toMutableList()
+        setupMicSpinnerWithDevices(availableDevices)
+        restartRecording()
+        Toast.makeText(this, "Mic \"$name\" disconnected — using default", Toast.LENGTH_LONG).show()
+    }
+
     private fun runLatencyMeasurement() {
         val chirpDurationMs = 100
         val numSamples = (sampleRate * chirpDurationMs / 1000f).toInt()
@@ -829,6 +883,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        unregisterDeviceCallback()
         stopRecording()
     }
 }
