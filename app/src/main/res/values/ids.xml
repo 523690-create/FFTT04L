@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Referenced by WaveletActivity.updateLabelPosition for slider-bar tinting. Declared here so
+         the reference stays valid independent of which layout (if any) defines the view. -->
+    <item name="sliderColor" type="id" />
+</resources>

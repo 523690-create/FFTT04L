@@ -34,7 +34,6 @@ import com.google.android.material.slider.Slider
 import java.io.File
 import kotlin.math.*
 import kotlin.concurrent.thread
-import android.content.res.Configuration
 
 class ViewerActivity : AppCompatActivity() {
 
@@ -177,8 +176,6 @@ class ViewerActivity : AppCompatActivity() {
         blurSpinner = findViewById(R.id.vBlurSpinner)
         btnSweep = findViewById(R.id.btnViewerSweep)
 
-        val isLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-
         findViewById<Button>(R.id.btnViewerGalleryTop).setOnClickListener { finish() }
         findViewById<Button>(R.id.btnViewerListenTop).setOnClickListener {
             val intent = Intent(this, MainActivity::class.java)
@@ -199,21 +196,14 @@ class ViewerActivity : AppCompatActivity() {
         }
 
         setupFftSpinners()
-        
-        // Landscape loses sweep, wave, color, blur, and filter capability
-        if (!isLandscape) {
-            setupColorSpinner()
-            setupNoiseFilter()
-            setupBlurSpinner()
-            setupEnhanceButton()
-        } else {
-            // Restore saved settings even if controls are hidden
-            val savedColorScheme = prefs.getInt("color_scheme", 0)
-            viewerFft.setColorScheme(savedColorScheme)
-            val savedBlur = prefs.getInt("blur_radius", 0).coerceIn(0, 10)
-            viewerFft.setBlur(savedBlur)
-        }
-        
+
+        // Controls now exist in both orientations (landscape uses the same tabbed sidebar), so the
+        // full control set is wired regardless of orientation.
+        setupColorSpinner()
+        setupNoiseFilter()
+        setupBlurSpinner()
+        setupEnhanceButton()
+
         setupEqSliders()
         setupViewerTabs()
     }

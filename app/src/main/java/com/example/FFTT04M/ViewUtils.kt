@@ -16,6 +16,8 @@ import com.google.android.material.slider.Slider
  * they're positioned and sized at runtime by the activities' label code, which would fight autosizing.
  */
 fun applyAutoSizeText(root: View, minSp: Int = 6, maxSp: Int = 18) {
+    // TabLayout manages its own tab-label sizing; autosizing its internal TextViews fights it.
+    if (root is com.google.android.material.tabs.TabLayout) return
     if (root is ViewGroup) {
         val hasSlider = (0 until root.childCount).any { root.getChildAt(it) is Slider }
         for (i in 0 until root.childCount) {
