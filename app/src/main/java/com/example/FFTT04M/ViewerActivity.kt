@@ -20,12 +20,15 @@ import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.CheckBox
+import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.ScrollView
 import android.widget.Spinner
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.slider.Slider
 import java.io.File
@@ -156,7 +159,9 @@ class ViewerActivity : AppCompatActivity() {
             finish()
         }
         findViewById<Button>(R.id.btnViewerPlay).setOnClickListener { playAudio() }
-        
+
+        findViewById<Button?>(R.id.btnViewerNote)?.setOnClickListener { showCommentDialog() }
+
         // btnViewerWavelet is optional in landscape (View placeholder used)
         findViewById<View?>(R.id.btnViewerWavelet)?.setOnClickListener {
             val intent = Intent(this, WaveletActivity::class.java).apply {
@@ -297,6 +302,48 @@ class ViewerActivity : AppCompatActivity() {
         setTextColor(Color.parseColor("#FF69B4"))
         setTypeface(typeface, android.graphics.Typeface.BOLD)
         setPadding(0, (10 * resources.displayMetrics.density).toInt(), 0, 0)
+    }
+
+    /**
+     * Edit the recording's comment (a `<name>.txt` sidecar shown in the Gallery). Saving also
+     * refreshes the gallery thumbnail with the FFT map exactly as currently displayed.
+     */
+    private fun showCommentDialog() {
+        val path = filePath ?: return
+        val rec = File(path)
+        val txtFile = File(rec.parentFile, rec.nameWithoutExtension + ".txt")
+        val existing = try { if (txtFile.exists()) txtFile.readText() else "" } catch (_: Exception) { "" }
+
+        val input = EditText(this).apply {
+            setText(existing)
+            setSelection(text.length)
+            hint = "Comment for ${rec.name}"
+            setSingleLine(false)
+            maxLines = 4
+        }
+        val pad = (16 * resources.displayMetrics.density).toInt()
+        val container = FrameLayout(this).apply { setPadding(pad, pad / 2, pad, 0); addView(input) }
+
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Comment")
+            .setView(container)
+            .setPositiveButton("Save") { _, _ ->
+                val text = input.text.toString().trim()
+                try {
+                    if (text.isEmpty()) {
+                        if (txtFile.exists()) txtFile.delete()
+                    } else {
+                        txtFile.writeText(text)
+                    }
+                    // Replace the gallery icon with the current FFT analysis rendering as displayed.
+                    viewerFft.saveSnapshot(rec.nameWithoutExtension + ".png")
+                    Toast.makeText(this, "Comment saved", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Toast.makeText(this, "Save failed: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun updateEnhanceButton() {

@@ -51,6 +51,13 @@ class GalleryActivity : AppCompatActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        // A comment edit in the Viewer can change the sidecar .txt and the .png thumbnail; reload so
+        // those changes (and any newly recorded files) show without leaving the gallery.
+        loadFiles()
+    }
+
     private fun loadFiles() {
         val filesDir = getExternalFilesDir(null)
         files = filesDir?.listFiles { file -> file.extension == "flac" }
@@ -76,8 +83,10 @@ class GalleryActivity : AppCompatActivity() {
             .setMessage("Remove ${file.name}?")
             .setPositiveButton("DELETE") { _, _ ->
                 val iconFile = File(file.parent, file.nameWithoutExtension + ".png")
+                val commentFile = File(file.parent, file.nameWithoutExtension + ".txt")
                 if (file.exists()) file.delete()
                 if (iconFile.exists()) iconFile.delete()
+                if (commentFile.exists()) commentFile.delete()
                 files.removeAt(position)
                 recyclerView.adapter?.notifyItemRemoved(position)
             }
@@ -96,31 +105,43 @@ class GalleryActivity : AppCompatActivity() {
             val file = files[position]
             val isLandscape = holder.itemView.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
             
+            val boxParams = holder.textBox.layoutParams as LinearLayout.LayoutParams
             if (isGridView || isLandscape) {
                 holder.root.orientation = LinearLayout.VERTICAL
-                holder.textView.layoutParams.width = ViewGroup.LayoutParams.MATCH_PARENT
-                holder.textView.layoutParams.height = ViewGroup.LayoutParams.WRAP_CONTENT
+                boxParams.width = ViewGroup.LayoutParams.MATCH_PARENT
+                boxParams.weight = 0f
+                boxParams.marginStart = 0
+                holder.textBox.setPadding(0, 4, 0, 0)
                 holder.textView.gravity = android.view.Gravity.CENTER
                 holder.textView.maxLines = 1
                 holder.textView.ellipsize = android.text.TextUtils.TruncateAt.END
-                holder.textView.setPadding(0, 4, 0, 0)
-                // Remove margin for grid
-                val params = holder.textView.layoutParams as LinearLayout.LayoutParams
-                params.marginStart = 0
+                holder.commentView.gravity = android.view.Gravity.CENTER
+                holder.commentView.maxLines = 1
+                holder.commentView.ellipsize = android.text.TextUtils.TruncateAt.END
             } else {
                 holder.root.orientation = LinearLayout.HORIZONTAL
-                holder.textView.layoutParams.width = 0
-                holder.textView.layoutParams.height = ViewGroup.LayoutParams.WRAP_CONTENT
+                boxParams.width = 0
+                boxParams.weight = 1f
+                boxParams.marginStart = 8
+                holder.textBox.setPadding(0, 0, 0, 0)
                 holder.textView.gravity = android.view.Gravity.START
                 holder.textView.maxLines = Int.MAX_VALUE
-                holder.textView.setPadding(0, 0, 0, 0)
-                val params = holder.textView.layoutParams as LinearLayout.LayoutParams
-                params.weight = 1f
-                params.marginStart = 8
+                holder.commentView.gravity = android.view.Gravity.START
+                holder.commentView.maxLines = 3
+                holder.commentView.ellipsize = android.text.TextUtils.TruncateAt.END
             }
 
             holder.textView.text = file.name
-            
+
+            val commentFile = File(file.parent, file.nameWithoutExtension + ".txt")
+            val comment = if (commentFile.exists()) commentFile.readText().trim() else ""
+            if (comment.isEmpty()) {
+                holder.commentView.visibility = View.GONE
+            } else {
+                holder.commentView.visibility = View.VISIBLE
+                holder.commentView.text = comment
+            }
+
             val iconFile = File(file.parent, file.nameWithoutExtension + ".png")
             if (iconFile.exists()) {
                 val bitmap = BitmapFactory.decodeFile(iconFile.absolutePath)
@@ -147,7 +168,9 @@ class GalleryActivity : AppCompatActivity() {
         inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
             val root: LinearLayout = view.findViewById(R.id.galleryItemRoot)
             val imageView: ImageView = view.findViewById(R.id.itemIcon)
+            val textBox: LinearLayout = view.findViewById(R.id.itemTextBox)
             val textView: TextView = view.findViewById(R.id.itemText)
+            val commentView: TextView = view.findViewById(R.id.itemComment)
         }
     }
 }

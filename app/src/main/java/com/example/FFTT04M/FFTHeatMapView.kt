@@ -468,6 +468,21 @@ class FFTHeatMapView @JvmOverloads constructor(
         return Color.rgb(r, g, b)
     }
 
+    /**
+     * Capture the whole heat-map exactly as displayed (current pan/zoom/colors) to a 256x256 PNG.
+     * Used to refresh a recording's gallery thumbnail when its comment is saved.
+     */
+    fun saveSnapshot(fileName: String) {
+        if (width <= 0 || height <= 0) return
+        val full = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        draw(Canvas(full))
+        val icon = Bitmap.createScaledBitmap(full, 256, 256, true)
+        val file = File(context.getExternalFilesDir(null), fileName)
+        FileOutputStream(file).use { out ->
+            icon.compress(Bitmap.CompressFormat.PNG, 100, out)
+        }
+    }
+
     fun saveIcon(cropRect: RectF, fileName: String) {
         if (width <= 0 || height <= 0) return
         val fullRender = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)

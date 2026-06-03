@@ -58,6 +58,18 @@
                 android:textColor="#000000"
                 android:textSize="10sp"
                 android:textStyle="bold"
+                android:layout_marginEnd="4dp"
+                style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
+            <Button
+                android:id="@+id/btnViewerNote"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_weight="1"
+                android:text="NOTE"
+                android:backgroundTint="#FFFFFF"
+                android:textColor="#000000"
+                android:textSize="10sp"
+                android:textStyle="bold"
                 style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
         </LinearLayout>
 
