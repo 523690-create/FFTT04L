@@ -121,15 +121,25 @@ class WaveletActivity : AppCompatActivity() {
         txtThresholdValue = findViewById(R.id.txtThresholdValue)
         txtSafetyStatus = findViewById(R.id.txtSafetyStatus)
 
-        prefs = getSharedPreferences("app_settings", MODE_PRIVATE)
+        filePath = intent.getStringExtra("FILE_PATH")
+        // Persist analysis/display settings per recording (shares the rec_<name> namespace with the
+        // FFT Viewer, so e.g. the colour scheme stays consistent for a given recording).
+        prefs = getSharedPreferences(prefsNameForFile(filePath), MODE_PRIVATE)
         loadPrefs()
         setupControls()
 
-        filePath = intent.getStringExtra("FILE_PATH")
         waveletView.post {
             updateAllLabelPositions()
             filePath?.let { loadAndDecode(File(it)) }
         }
+    }
+
+    /** Per-recording settings namespace; mirrors ViewerActivity.prefsNameForFile. */
+    private fun prefsNameForFile(path: String?): String {
+        if (path.isNullOrEmpty()) return "app_settings"
+        val base = File(path).nameWithoutExtension
+        val safe = buildString { for (c in base) append(if (c.isLetterOrDigit()) c else '_') }
+        return "rec_$safe"
     }
 
     private fun updateAllLabelPositions() {

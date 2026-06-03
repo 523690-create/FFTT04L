@@ -91,10 +91,11 @@ class ViewerActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_viewer)
 
-        prefs = getSharedPreferences("app_settings", Context.MODE_PRIVATE)
         viewerFft = findViewById(R.id.viewerFft)
         viewerProgress = findViewById(R.id.viewerProgress)
         filePath = intent.getStringExtra("FILE_PATH")
+        // Persist analysis/display settings per recording: each file gets its own prefs namespace.
+        prefs = getSharedPreferences(prefsNameForFile(filePath), Context.MODE_PRIVATE)
 
         setupControls()
 
@@ -107,6 +108,18 @@ class ViewerActivity : AppCompatActivity() {
                 updateAllLabelPositions()
             }
         }
+    }
+
+    /**
+     * Per-recording settings namespace. Each recording stores its own analysis/display settings so
+     * reopening it restores exactly what was last used for that file. Falls back to the shared
+     * "app_settings" when there is no file (shouldn't happen from the Gallery).
+     */
+    private fun prefsNameForFile(path: String?): String {
+        if (path.isNullOrEmpty()) return "app_settings"
+        val base = File(path).nameWithoutExtension
+        val safe = buildString { for (c in base) append(if (c.isLetterOrDigit()) c else '_') }
+        return "rec_$safe"
     }
 
     private fun updateAllLabelPositions() {
