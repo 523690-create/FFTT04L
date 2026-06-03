@@ -127,12 +127,40 @@ class WaveletActivity : AppCompatActivity() {
         prefs = getSharedPreferences(prefsNameForFile(filePath), MODE_PRIVATE)
         loadPrefs()
         setupControls()
+        setupWaveletTabs()
         applyAutoSizeText(findViewById(android.R.id.content))
 
         waveletView.post {
             updateAllLabelPositions()
             filePath?.let { loadAndDecode(File(it)) }
         }
+    }
+
+    /**
+     * Tabbed control panel: a TabLayout switches between the SETUP page (families/mode + toggles)
+     * and the SLIDERS page. Null-guarded for the stub-only landscape layout. Slider value labels are
+     * repositioned when the sliders page becomes visible; the selected tab is persisted per recording.
+     */
+    private fun setupWaveletTabs() {
+        val tabs = findViewById<com.google.android.material.tabs.TabLayout?>(R.id.waveletTabs) ?: return
+        val pageSetup = findViewById<View?>(R.id.pageWaveletSetup)
+        val pageSliders = findViewById<View?>(R.id.pageWaveletSliders)
+        fun show(index: Int) {
+            pageSetup?.visibility = if (index == 0) View.VISIBLE else View.GONE
+            pageSliders?.visibility = if (index == 1) View.VISIBLE else View.GONE
+            if (index == 1) findViewById<View>(android.R.id.content).post { updateAllLabelPositions() }
+        }
+        tabs.addOnTabSelectedListener(object : com.google.android.material.tabs.TabLayout.OnTabSelectedListener {
+            override fun onTabSelected(tab: com.google.android.material.tabs.TabLayout.Tab) {
+                show(tab.position)
+                prefs.edit { putInt("wavelet_tab", tab.position) }
+            }
+            override fun onTabUnselected(tab: com.google.android.material.tabs.TabLayout.Tab) {}
+            override fun onTabReselected(tab: com.google.android.material.tabs.TabLayout.Tab) {}
+        })
+        val initial = prefs.getInt("wavelet_tab", 0).coerceIn(0, tabs.tabCount - 1)
+        tabs.getTabAt(initial)?.select()
+        show(initial)
     }
 
     /** Per-recording settings namespace; mirrors ViewerActivity.prefsNameForFile. */
