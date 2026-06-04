@@ -128,22 +128,6 @@
             app:layout_constraintEnd_toEndOf="@+id/viewerFft"
             app:layout_constraintTop_toTopOf="@+id/viewerFft"
             app:layout_constraintBottom_toBottomOf="@+id/viewerFft" />
-
-        <!-- Live Size/Step overlay -->
-        <TextView
-            android:id="@+id/txtViewerSzSt"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_margin="4dp"
-            android:paddingHorizontal="4dp"
-            android:paddingVertical="1dp"
-            android:background="#80000000"
-            android:text="Sz: 2048 / St: 1024"
-            android:textColor="#FFFFFF"
-            android:textSize="8sp"
-            android:textStyle="bold"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintEnd_toEndOf="parent" />
     </androidx.constraintlayout.widget.ConstraintLayout>
 
     <!-- Tab Bar: 0.11 of allowance -->

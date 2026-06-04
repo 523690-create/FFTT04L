@@ -39,16 +39,28 @@ fun applyAutoSizeText(root: View, minSp: Int = 6, maxSp: Int = 18) {
  */
 fun TextView.setMaxTextSizeToFit(
     text: String,
-    maxWidthRatio: Float = 0.9f,
-    maxHeightRatio: Float = 0.9f,
+    maxWidthRatio: Float = 0.95f,
+    maxHeightRatio: Float = 0.95f,
     minSizeSp: Float = 6f,
     maxSizeSp: Float = 100f
 ) {
     val parent = this.parent as? View ?: return
+    
+    // Use a layout listener if dimensions aren't ready yet.
+    if (parent.width <= 0 || parent.height <= 0) {
+        parent.viewTreeObserver.addOnGlobalLayoutListener(object : android.view.ViewTreeObserver.OnGlobalLayoutListener {
+            override fun onGlobalLayout() {
+                if (parent.width > 0 && parent.height > 0) {
+                    parent.viewTreeObserver.removeOnGlobalLayoutListener(this)
+                    setMaxTextSizeToFit(text, maxWidthRatio, maxHeightRatio, minSizeSp, maxSizeSp)
+                }
+            }
+        })
+        return
+    }
+
     val targetWidth = parent.width * maxWidthRatio
     val targetHeight = parent.height * maxHeightRatio
-
-    if (targetWidth <= 0 || targetHeight <= 0) return
 
     val paint = android.graphics.Paint(this.paint)
     var low = minSizeSp
