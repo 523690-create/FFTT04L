@@ -421,9 +421,13 @@ class MainActivity : AppCompatActivity() {
             (spinner.selectedView as? android.widget.TextView)?.apply {
                 setTextColor(fg)
                 setBackgroundColor(bg)
-                text = "COLOR"
+                setMaxTextSizeToFit("COLOR")
             }
         }
+    }
+
+    private fun fitSpinner(s: Spinner?) {
+        s?.post { (s.selectedView as? TextView)?.let { it.setMaxTextSizeToFit(it.text.toString()) } }
     }
 
     private fun setupMicSpinnerWithDevices(devices: List<AudioDeviceInfo>) {
@@ -443,6 +447,7 @@ class MainActivity : AppCompatActivity() {
             if (idx >= 0) {
                 selectedDevice = devices[idx]
                 spinner.setSelection(idx)
+                fitSpinner(spinner)
             }
         }
 
@@ -453,6 +458,7 @@ class MainActivity : AppCompatActivity() {
                 if (newDevice != selectedDevice) {
                     selectedDevice = newDevice
                     prefs.edit { putString("mic_device", deviceNames[position]) }
+                    fitSpinner(micSpinner)
                     restartRecording()
                 }
             }
@@ -687,20 +693,37 @@ class MainActivity : AppCompatActivity() {
         var minBufferSize = AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, encoding)
         var bufferSize = max(minBufferSize, fftSize * 4)
         
-        var record: AudioRecord? = try {
-            val r = AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate, AudioFormat.CHANNEL_IN_MONO, encoding, bufferSize)
-            if (r.state != AudioRecord.STATE_INITIALIZED) {
-                r.release()
-                null
-            } else r
-        } catch (e: Exception) { null }
+        fun tryInitRecord(src: Int, enc: Int, size: Int): AudioRecord? {
+            return try {
+                val r = AudioRecord(src, sampleRate, AudioFormat.CHANNEL_IN_MONO, enc, size)
+                if (r.state != AudioRecord.STATE_INITIALIZED) {
+                    r.release()
+                    null
+                } else r
+            } catch (e: Exception) { 
+                android.util.Log.e("FFTT04M", "Failed to init AudioRecord (src=$src, enc=$enc): ${e.message}")
+                null 
+            }
+        }
+
+        var record = tryInitRecord(MediaRecorder.AudioSource.MIC, encoding, bufferSize)
 
         if (record == null) {
-            android.util.Log.w("FFTT04M", "PCM_FLOAT recording unavailable; falling back to PCM_16BIT")
+            android.util.Log.w("FFTT04M", "PCM_FLOAT recording unavailable or failed to init; trying PCM_16BIT")
             encoding = AudioFormat.ENCODING_PCM_16BIT
             minBufferSize = AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, encoding)
             bufferSize = max(minBufferSize, fftSize * 2)
-            record = AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate, AudioFormat.CHANNEL_IN_MONO, encoding, bufferSize)
+            record = tryInitRecord(MediaRecorder.AudioSource.MIC, encoding, bufferSize)
+        }
+
+        if (record == null) {
+            android.util.Log.w("FFTT04M", "MIC source failed; trying CAMCORDER source")
+            record = tryInitRecord(MediaRecorder.AudioSource.CAMCORDER, encoding, bufferSize)
+        }
+
+        if (record == null) {
+            Toast.makeText(this, "Failed to initialize audio recording", Toast.LENGTH_LONG).show()
+            return
         }
 
         activeEncoding = encoding

@@ -42,7 +42,6 @@ class ViewerActivity : AppCompatActivity() {
     private lateinit var stepSpinner: Spinner
     private lateinit var colorSpinner: Spinner
     private lateinit var blurSpinner: Spinner
-    private lateinit var enhanceSpinner: Spinner
     private lateinit var btnSweep: Button
     private var viewerProgress: android.widget.ProgressBar? = null
 
@@ -110,10 +109,13 @@ class ViewerActivity : AppCompatActivity() {
             filePath?.let { path ->
                 loadAndDecode(File(path))
             }
-            // Initial label positioning
-            findViewById<android.view.View>(android.R.id.content).post {
-                updateAllLabelPositions()
-            }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        findViewById<android.view.View>(android.R.id.content).post {
+            updateAllLabelPositions()
         }
     }
 
@@ -167,7 +169,11 @@ class ViewerActivity : AppCompatActivity() {
             R.id.vTxtFilterValue, R.id.vTxtRiseValue, R.id.vTxtFallValue
         )
         for (id in labelsToFit) {
-            findViewById<TextView>(id)?.let { it.setMaxTextSizeToFit(it.text.toString()) }
+            val tv = findViewById<TextView>(id) ?: continue
+            // Only fit if visible and has a parent with dimensions.
+            if ((tv.visibility == View.VISIBLE) && ((tv.parent as? View)?.width ?: 0 > 0)) {
+                tv.setMaxTextSizeToFit(tv.text.toString())
+            }
         }
     }
 
@@ -181,24 +187,26 @@ class ViewerActivity : AppCompatActivity() {
         }
     }
 
+    private fun fitSpinner(s: Spinner) {
+        (s.selectedView as? TextView)?.let { it.setMaxTextSizeToFit(it.text.toString()) }
+    }
+
     private fun setupControls() {
         sizeSpinner = findViewById(R.id.vSizeSpinner)
         stepSpinner = findViewById(R.id.vStepSpinner)
         colorSpinner = findViewById(R.id.vColorSpinner)
         blurSpinner = findViewById(R.id.vBlurSpinner)
-        enhanceSpinner = findViewById(R.id.vEnhanceSpinner)
-        enhanceSpinner.visibility = android.view.View.GONE
-        enhanceSpinner.isEnabled = false
+        // enhanceSpinner is redundant (hidden in layout); logic moved to Enhance button.
         btnSweep = findViewById(R.id.btnViewerSweep)
 
-        findViewById<Button>(R.id.btnViewerGalleryTop).setOnClickListener { finish() }
-        findViewById<Button>(R.id.btnViewerListenTop).setOnClickListener {
+        findViewById<Button>(R.id.btnViewerGalleryTop)?.setOnClickListener { finish() }
+        findViewById<Button>(R.id.btnViewerListenTop)?.setOnClickListener {
             val intent = Intent(this, MainActivity::class.java)
             intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
             startActivity(intent)
             finish()
         }
-        findViewById<Button>(R.id.btnViewerPlay).setOnClickListener { playAudio() }
+        findViewById<Button>(R.id.btnViewerPlay)?.setOnClickListener { playAudio() }
 
         findViewById<Button?>(R.id.btnViewerNote)?.setOnClickListener { showCommentDialog() }
 
@@ -217,7 +225,6 @@ class ViewerActivity : AppCompatActivity() {
         setupColorSpinner()
         setupNoiseFilter()
         setupBlurSpinner()
-        setupEnhanceSpinner()
         setupEnhanceButton()
 
         setupEqSliders()
@@ -285,50 +292,11 @@ class ViewerActivity : AppCompatActivity() {
             (colorSpinner.selectedView as? android.widget.TextView)?.apply {
                 setTextColor(fg)
                 setBackgroundColor(bg)
-                text = "COLOR"
+                setMaxTextSizeToFit("COLOR")
             }
         }
     }
 
-    private fun setupEnhanceSpinner() {
-        val modeList = listOf("None (plain STFT)") + enhanceModeNames.toList()
-        val enhanceDisplayNames = modeList.map { getString(R.string.enhance_prefix, it) }
-        val enhanceAdapter = ArrayAdapter(this, R.layout.spinner_item_enhance_orange, enhanceDisplayNames)
-        enhanceAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        enhanceSpinner.adapter = enhanceAdapter
-        updateEnhanceSpinner()
-
-        enhanceSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(p0: AdapterView<*>?, p1: android.view.View?, pos: Int, p3: Long) {
-                // Single selection via spinner: only engines (0..4), no post-processors via spinner
-                for (i in enhanceSelected.indices) enhanceSelected[i] = false
-                if (pos > 0) {
-                    val engineIdx = pos - 1
-                    if (engineIdx < engineCount) {
-                        enhanceSelected[engineIdx] = true
-                    }
-                }
-                var m = 0
-                for (i in enhanceSelected.indices) if (enhanceSelected[i]) m = m or (1 shl i)
-                prefs.edit { putInt("enhance_mask_v3", m) }
-                updateEnhanceButton()
-                triggerRefresh()
-            }
-            override fun onNothingSelected(p0: AdapterView<*>?) {}
-        }
-    }
-
-    private fun updateEnhanceSpinner() {
-        // Find the active engine or show "None"
-        var activeIdx = 0
-        for (i in 0 until engineCount) {
-            if (enhanceSelected[i]) {
-                activeIdx = i + 1  // Spinner index = engine index + 1 (for "None" at 0)
-                break
-            }
-        }
-        enhanceSpinner.setSelection(activeIdx, false)
-    }
 
     // --- Enhance control (borrowed from FFTT02M, extended to mixed-mode checkboxes) ---
     // Indices 0..3 are the mutually-exclusive engines that build the base map (shown as radio
@@ -484,9 +452,11 @@ class ViewerActivity : AppCompatActivity() {
         val engineActive = (0 until engineCount).any { enhanceSelected[it] }
         sizeSpinner.isEnabled = !engineActive
         stepSpinner.isEnabled = !engineActive
-
-        // Update the enhance spinner to match the button state
-        updateEnhanceSpinner()
+        sizeSpinner.alpha = if (engineActive) 0.4f else 1.0f
+        stepSpinner.alpha = if (engineActive) 0.4f else 1.0f
+        
+        // Notify the heat map to hide Sz/St labels when an engine is building the map.
+        viewerFft.setEngineActive(engineActive)
     }
 
     /**
@@ -591,6 +561,7 @@ class ViewerActivity : AppCompatActivity() {
             override fun onItemSelected(p0: AdapterView<*>?, p1: android.view.View?, pos: Int, p3: Long) {
                 viewerFft.setBlur(pos)
                 prefs.edit { putInt("blur_radius", pos) }
+                fitSpinner(blurSpinner)
                 triggerRefresh()
             }
             override fun onNothingSelected(p0: AdapterView<*>?) {}
@@ -618,6 +589,7 @@ class ViewerActivity : AppCompatActivity() {
                     currentFftSize = newSize
                     prefs.edit { putInt("fft_size_idx", pos) }
                     updateStepSpinner(currentFftSize)
+                    fitSpinner(sizeSpinner)
                     triggerRefresh()
                 }
             }
@@ -654,6 +626,7 @@ class ViewerActivity : AppCompatActivity() {
                     // Save index relative to standard fftValues for simplicity if it exists, otherwise just save value
                     val globalIdx = fftValues.indexOf(newStep)
                     if (globalIdx != -1) prefs.edit { putInt("fft_step_idx", globalIdx) }
+                    fitSpinner(stepSpinner)
                     triggerRefresh()
                 }
             }
