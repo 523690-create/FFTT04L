@@ -168,7 +168,8 @@ class ViewerActivity : AppCompatActivity() {
             R.id.lblEq100, R.id.lblEq300, R.id.lblEq1k, R.id.lblEq3k, R.id.lblEq8k,
             R.id.lblFilterPercent, R.id.lblFilterRise, R.id.lblFilterFall,
             R.id.txtEq100Value, R.id.txtEq300Value, R.id.txtEq1kValue, R.id.txtEq3kValue, R.id.txtEq8kValue,
-            R.id.vTxtFilterValue, R.id.vTxtRiseValue, R.id.vTxtFallValue
+            R.id.vTxtFilterValue, R.id.vTxtRiseValue, R.id.vTxtFallValue,
+            R.id.btnViewerGalleryTop, R.id.btnViewerListenTop, R.id.btnViewerWavelet, R.id.btnViewerNote, R.id.btnViewerPlay
         )
         for (id in labelsToFit) {
             val tv = findViewById<TextView>(id) ?: continue
@@ -395,7 +396,7 @@ class ViewerActivity : AppCompatActivity() {
                 updateEnhanceButton()
                 triggerRefresh()
             }
-            .setNeutralButton("Clear All") { _, _ ->
+            .setNeutralButton("CLEAR") { _, _ ->
                 enhanceSelected.fill(false)
                 prefs.edit { putInt("enhance_mask_v3", 0) }
                 updateEnhanceButton()
