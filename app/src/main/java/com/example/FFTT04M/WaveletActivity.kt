@@ -132,7 +132,16 @@ class WaveletActivity : AppCompatActivity() {
 
         waveletView.post {
             updateAllLabelPositions()
+            fitSpinner(colorSpinner)
             filePath?.let { loadAndDecode(File(it)) }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        findViewById<View>(android.R.id.content).post {
+            updateAllLabelPositions()
+            fitSpinner(colorSpinner)
         }
     }
 
@@ -169,6 +178,10 @@ class WaveletActivity : AppCompatActivity() {
         val base = File(path).nameWithoutExtension
         val safe = buildString { for (c in base) append(if (c.isLetterOrDigit()) c else '_') }
         return "rec_$safe"
+    }
+
+    private fun fitSpinner(s: Spinner?) {
+        s?.post { (s.selectedView as? TextView)?.let { it.setMaxTextSizeToFit(it.text.toString()) } }
     }
 
     private fun updateAllLabelPositions() {
