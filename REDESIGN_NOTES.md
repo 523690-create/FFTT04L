@@ -11,6 +11,8 @@ commit per change**, so non-optimal changes can be reverted selectively with
   If two engines are selected, the highest-priority one wins (priority: Synchrosqueeze > Reassignment
   > Constant-Q > Sweep+). Post-processors (Gaussian, Bilateral, TV Denoise, Butterworth, Multitaper)
   stack on top. The original additive "Sweep" engine has been removed (see changelog).
+- **Build Convention**: APKs are generated with a timestamp in the project root: `FFTT04M-yyyyMMdd-HHmmss.apk`.
+  Use the PowerShell command documented in `agents.md` to build and rename.
 
 ## Changelog (newest first)
 

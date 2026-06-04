@@ -44,6 +44,7 @@ class ViewerActivity : AppCompatActivity() {
     private lateinit var blurSpinner: Spinner
     private lateinit var enhanceSpinner: Spinner
     private lateinit var btnSweep: Button
+    private lateinit var txtSzSt: TextView
     private var viewerProgress: android.widget.ProgressBar? = null
 
     // Busy indicator shown only when a procedure runs longer than 100 ms (so quick refreshes don't
@@ -92,6 +93,7 @@ class ViewerActivity : AppCompatActivity() {
 
         viewerFft = findViewById(R.id.viewerFft)
         viewerProgress = findViewById(R.id.viewerProgress)
+        txtSzSt = findViewById(R.id.txtViewerSzSt)
         filePath = intent.getStringExtra("FILE_PATH")
         // Persist analysis/display settings per recording: each file gets its own prefs namespace.
         prefs = getSharedPreferences(prefsNameForFile(filePath), Context.MODE_PRIVATE)
@@ -170,6 +172,10 @@ class ViewerActivity : AppCompatActivity() {
         }
     }
 
+    private fun updateSzStLabel() {
+        txtSzSt.text = "Sz: $currentFftSize / St: $currentStepSize"
+    }
+
     private fun setupControls() {
         sizeSpinner = findViewById(R.id.vSizeSpinner)
         stepSpinner = findViewById(R.id.vStepSpinner)
@@ -200,6 +206,7 @@ class ViewerActivity : AppCompatActivity() {
         }
 
         setupFftSpinners()
+        updateSzStLabel()
 
         // Controls now exist in both orientations (landscape uses the same tabbed sidebar), so the
         // full control set is wired regardless of orientation.
@@ -607,6 +614,7 @@ class ViewerActivity : AppCompatActivity() {
                     currentFftSize = newSize
                     prefs.edit { putInt("fft_size_idx", pos) }
                     updateStepSpinner(currentFftSize)
+                    updateSzStLabel()
                     triggerRefresh()
                 }
             }
@@ -643,6 +651,7 @@ class ViewerActivity : AppCompatActivity() {
                     // Save index relative to standard fftValues for simplicity if it exists, otherwise just save value
                     val globalIdx = fftValues.indexOf(newStep)
                     if (globalIdx != -1) prefs.edit { putInt("fft_step_idx", globalIdx) }
+                    updateSzStLabel()
                     triggerRefresh()
                 }
             }

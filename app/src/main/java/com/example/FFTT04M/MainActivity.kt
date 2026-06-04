@@ -765,8 +765,8 @@ class MainActivity : AppCompatActivity() {
         audioRecord?.release()
         audioRecord = null
         val audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
-        if (audioManager.communicationDevice?.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (audioManager.communicationDevice?.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO) {
                 audioManager.clearCommunicationDevice()
             }
         }

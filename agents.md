@@ -33,7 +33,9 @@
 
 ## **Addendum**
 - Use a red‑blue roundel as the project icon.
-- For each build, name the APK file `FFTT04M-[date and time stamp].apk`.
+- For each build, name the APK file `FFTT04M-[date and time stamp].apk` and place it in the project root.
+- To generate a timestamped APK, run:
+  `$timestamp = Get-Date -Format "yyyyMMdd-HHmmss"; ./gradlew :app:assembleDebug; if ($?) { cp app/build/outputs/apk/debug/app-debug.apk "FFTT04M-$timestamp.apk" }`
 
 ---
 
