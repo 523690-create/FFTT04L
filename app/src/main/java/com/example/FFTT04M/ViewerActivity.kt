@@ -160,6 +160,18 @@ class ViewerActivity : AppCompatActivity() {
                 adjustSliderThickness(slider, label)
             }
         }
+
+        // Apply robust auto-sizing to ALL relevant labels to fix "printed too small" issues.
+        val labelsToFit = intArrayOf(
+            R.id.lblEq100, R.id.lblEq300, R.id.lblEq1k, R.id.lblEq3k, R.id.lblEq8k,
+            R.id.lblFilterPercent, R.id.lblFilterRise, R.id.lblFilterFall,
+            R.id.txtEq100Value, R.id.txtEq300Value, R.id.txtEq1kValue, R.id.txtEq3kValue, R.id.txtEq8kValue,
+            R.id.vTxtFilterValue, R.id.vTxtRiseValue, R.id.vTxtFallValue
+        )
+        for (id in labelsToFit) {
+            findViewById<TextView>(id)?.let { it.setMaxTextSizeToFit(it.text.toString()) }
+        }
+        updateSzStLabel()
     }
 
     private fun Slider.setSafeValue(v: Float) {
@@ -173,7 +185,7 @@ class ViewerActivity : AppCompatActivity() {
     }
 
     private fun updateSzStLabel() {
-        txtSzSt.text = "Sz: $currentFftSize / St: $currentStepSize"
+        txtSzSt.setMaxTextSizeToFit("Sz: $currentFftSize / St: $currentStepSize")
     }
 
     private fun setupControls() {

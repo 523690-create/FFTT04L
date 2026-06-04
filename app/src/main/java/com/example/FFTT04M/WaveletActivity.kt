@@ -177,7 +177,15 @@ class WaveletActivity : AppCompatActivity() {
         adjustSliderThickness(sliderSampling, txtSamplingValue)
         adjustSliderThickness(sliderThreshold, txtThresholdValue)
         
-        // Color control is a spinner now (styled in setupColorSpinner); no slider tinting needed.
+        // Apply robust auto-sizing to ALL relevant labels to fix "printed too small" issues.
+        val labelsToFit = intArrayOf(
+            R.id.txtLevelValue, R.id.txtOrderValue, R.id.txtSamplingValue, R.id.txtThresholdValue,
+            R.id.lblWavLevel, R.id.lblWavOrder, R.id.lblWavSampling, R.id.lblWavThreshold
+        )
+        for (id in labelsToFit) {
+            findViewById<TextView>(id)?.let { it.setMaxTextSizeToFit(it.text.toString()) }
+        }
+        updateSafetyStatus()
     }
 
     private fun adjustSliderThickness(slider: Slider, label: TextView?) {
@@ -341,12 +349,13 @@ class WaveletActivity : AppCompatActivity() {
         if (pcm == null || pcm.isEmpty()) { txtSafetyStatus.text = ""; return }
         val ceilingKhz = safeFreqCeiling() / 1000f
         val over = targetFreq > safeFreqCeiling()
-        txtSafetyStatus.text = if (over) {
+        val statusText = if (over) {
             "⚠ ${modeNames[analysisMode]}: FS above safe ${String.format(java.util.Locale.US, "%.1f", ceilingKhz)} kHz — will auto-ease"
         } else {
             "${modeNames[analysisMode]} · safe FS ≤ ${String.format(java.util.Locale.US, "%.1f", ceilingKhz)} kHz"
         }
         txtSafetyStatus.setTextColor(if (over) Color.YELLOW else Color.LTGRAY)
+        txtSafetyStatus.setMaxTextSizeToFit(statusText)
     }
 
     /**

@@ -453,13 +453,6 @@ class FFTHeatMapView @JvmOverloads constructor(
             canvas.drawLine(0f, y, w, y, linePaint)
             canvas.drawText("${f.toInt()}Hz", 10f, y - 5f, textPaint)
         }
-
-        // Draw Sz and St in the top right corner
-        val szText = "Sz $fftSize"
-        val stText = "St $stepSize"
-        val infoX = w - 10f
-        canvas.drawText(szText, infoX - textPaint.measureText(szText), 40f, textPaint)
-        canvas.drawText(stText, infoX - textPaint.measureText(stText), 80f, textPaint)
     }
 
     private fun freqToY(freq: Float, h: Float): Float {

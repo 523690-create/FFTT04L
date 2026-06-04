@@ -32,3 +32,56 @@ fun applyAutoSizeText(root: View, minSp: Int = 6, maxSp: Int = 18) {
         )
     }
 }
+
+/**
+ * Binary search for the maximum text size that fits within the parent's constraints.
+ * Handles multiline text by splitting by '\n' and measuring each line.
+ */
+fun TextView.setMaxTextSizeToFit(
+    text: String,
+    maxWidthRatio: Float = 0.9f,
+    maxHeightRatio: Float = 0.9f,
+    minSizeSp: Float = 6f,
+    maxSizeSp: Float = 100f
+) {
+    val parent = this.parent as? View ?: return
+    val targetWidth = parent.width * maxWidthRatio
+    val targetHeight = parent.height * maxHeightRatio
+
+    if (targetWidth <= 0 || targetHeight <= 0) return
+
+    val paint = android.graphics.Paint(this.paint)
+    var low = minSizeSp
+    var high = maxSizeSp
+    var best = low
+
+    val lines = text.split("\n")
+
+    while (low <= high) {
+        val mid = (low + high) / 2f
+        paint.textSize = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_SP, mid, resources.displayMetrics
+        )
+
+        var maxWidth = 0f
+        val bounds = android.graphics.Rect()
+        val fm = paint.fontMetrics
+        val lineHeight = fm.bottom - fm.top
+
+        for (line in lines) {
+            paint.getTextBounds(line, 0, line.length, bounds)
+            maxWidth = kotlin.math.max(maxWidth, bounds.width().toFloat())
+        }
+        val totalHeight = lines.size * lineHeight
+
+        if (maxWidth <= targetWidth && totalHeight <= targetHeight) {
+            best = mid
+            low = mid + 0.1f
+        } else {
+            high = mid - 0.1f
+        }
+    }
+
+    setTextSize(TypedValue.COMPLEX_UNIT_SP, best)
+    setText(text)
+}

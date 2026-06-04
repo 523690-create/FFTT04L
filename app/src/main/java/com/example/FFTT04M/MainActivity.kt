@@ -658,6 +658,8 @@ class MainActivity : AppCompatActivity() {
         label.elevation = 6f * density
     }
 
+    private var activeEncoding = AudioFormat.ENCODING_PCM_FLOAT
+
     private fun startRecording() {
         if (recording.get()) return
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) return
@@ -681,31 +683,51 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        val minBufferSize = AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_FLOAT)
-        val bufferSize = max(minBufferSize, fftSize * 4)
+        var encoding = AudioFormat.ENCODING_PCM_FLOAT
+        var minBufferSize = AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, encoding)
+        var bufferSize = max(minBufferSize, fftSize * 4)
         
-        val record = AudioRecord(
-            MediaRecorder.AudioSource.MIC,
-            sampleRate,
-            AudioFormat.CHANNEL_IN_MONO,
-            AudioFormat.ENCODING_PCM_FLOAT,
-            bufferSize
-        )
-        
-        selectedDevice?.let { record.setPreferredDevice(it) }
+        var record: AudioRecord? = try {
+            val r = AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate, AudioFormat.CHANNEL_IN_MONO, encoding, bufferSize)
+            if (r.state != AudioRecord.STATE_INITIALIZED) {
+                r.release()
+                null
+            } else r
+        } catch (e: Exception) { null }
+
+        if (record == null) {
+            android.util.Log.w("FFTT04M", "PCM_FLOAT recording unavailable; falling back to PCM_16BIT")
+            encoding = AudioFormat.ENCODING_PCM_16BIT
+            minBufferSize = AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, encoding)
+            bufferSize = max(minBufferSize, fftSize * 2)
+            record = AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate, AudioFormat.CHANNEL_IN_MONO, encoding, bufferSize)
+        }
+
+        activeEncoding = encoding
+        selectedDevice?.let { record?.setPreferredDevice(it) }
         
         audioRecord = record
         recording.set(true)
-        record.startRecording()
+        record?.startRecording()
 
         recordingThread = Thread {
             val audioBuffer = FloatArray(stepSize)
             val fftInput = FloatArray(fftSize)
             val real = FloatArray(fftSize)
             val imag = FloatArray(fftSize)
+            val shortBuffer = if (activeEncoding == AudioFormat.ENCODING_PCM_16BIT) ShortArray(stepSize) else null
 
-            while (recording.get() && record.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
-                val read = record.read(audioBuffer, 0, stepSize, AudioRecord.READ_BLOCKING)
+            while (recording.get() && record?.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
+                val read = if (activeEncoding == AudioFormat.ENCODING_PCM_FLOAT) {
+                    record.read(audioBuffer, 0, stepSize, AudioRecord.READ_BLOCKING)
+                } else {
+                    val r = record.read(shortBuffer!!, 0, stepSize, AudioRecord.READ_BLOCKING)
+                    if (r > 0) {
+                        for (i in 0 until r) audioBuffer[i] = shortBuffer[i] / 32768f
+                    }
+                    r
+                }
+
                 if (read > 0) {
                     for (i in 0 until read) {
                         var s = audioBuffer[i]
