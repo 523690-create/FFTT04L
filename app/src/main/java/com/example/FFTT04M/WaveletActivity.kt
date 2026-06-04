@@ -172,6 +172,8 @@ class WaveletActivity : AppCompatActivity() {
     }
 
     private fun updateAllLabelPositions() {
+        if (findViewById<View>(android.R.id.content).width <= 0) return
+
         adjustSliderThickness(sliderLevel, txtLevelValue)
         adjustSliderThickness(sliderOrder, txtOrderValue)
         adjustSliderThickness(sliderSampling, txtSamplingValue)
@@ -183,7 +185,10 @@ class WaveletActivity : AppCompatActivity() {
             R.id.lblWavLevel, R.id.lblWavOrder, R.id.lblWavSampling, R.id.lblWavThreshold
         )
         for (id in labelsToFit) {
-            findViewById<TextView>(id)?.let { it.setMaxTextSizeToFit(it.text.toString()) }
+            val tv = findViewById<TextView>(id) ?: continue
+            if ((tv.visibility == View.VISIBLE) && ((tv.parent as? View)?.width ?: 0 > 0)) {
+                tv.setMaxTextSizeToFit(tv.text.toString())
+            }
         }
         updateSafetyStatus()
     }

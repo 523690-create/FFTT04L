@@ -44,8 +44,8 @@ fun applyAutoSizeText(root: View, minSp: Int = 6, maxSp: Int = 18) {
  */
 fun TextView.setMaxTextSizeToFit(
     text: String,
-    maxWidthRatio: Float = 0.95f,
-    maxHeightRatio: Float = 0.95f,
+    maxWidthRatio: Float = 1.0f,
+    maxHeightRatio: Float = 1.0f,
     minSizeSp: Float = 6f,
     maxSizeSp: Float = 100f
 ) {
@@ -59,6 +59,9 @@ fun TextView.setMaxTextSizeToFit(
             val cacheKey = "fit_$text"
             val cacheVal = "${w}_${h}"
             if (this.getTag(R.id.tag_fit_text) != cacheKey || this.getTag(R.id.tag_fit_dims) != cacheVal) {
+                // Disable standard autosizing which might fight us
+                TextViewCompat.setAutoSizeTextTypeWithDefaults(this, TextViewCompat.AUTO_SIZE_TEXT_TYPE_NONE)
+
                 val targetWidth = w * maxWidthRatio
                 val targetHeight = h * maxHeightRatio
 

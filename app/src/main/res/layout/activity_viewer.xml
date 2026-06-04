@@ -255,6 +255,7 @@
                 android:layout_height="0dp"
                 android:layout_weight="0.11"
                 android:layout_marginBottom="2dp"
+                android:background="@android:color/transparent"
                 android:overlapAnchor="false" />
 
             <Spinner
@@ -263,6 +264,7 @@
                 android:layout_height="0dp"
                 android:layout_weight="0.11"
                 android:layout_marginBottom="2dp"
+                android:background="@android:color/transparent"
                 android:overlapAnchor="false" />
 
             <Button
@@ -295,6 +297,7 @@
                 android:layout_height="0dp"
                 android:layout_weight="0.11"
                 android:layout_marginBottom="2dp"
+                android:background="@android:color/transparent"
                 android:overlapAnchor="false" />
 
             <Spinner

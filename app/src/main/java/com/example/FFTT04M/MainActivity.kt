@@ -70,12 +70,12 @@ class MainActivity : AppCompatActivity() {
     private val recording = AtomicBoolean(false)
     private var audioRecord: AudioRecord? = null
     private var recordingThread: Thread? = null
-    private val sampleRate = 44100
+    private var sampleRate = 44100
     private val fftSize = 2048
     private val stepSize = 1024
     
     private val eqBands = floatArrayOf(100f, 300f, 1000f, 3000f, 8000f)
-    private val filters = Array(5) { i ->
+    private var filters = Array(5) { i ->
         BiquadFilter(BiquadFilter.Type.PEAKING, sampleRate.toFloat(), eqBands[i], 1.0f, 0f)
     }
 
@@ -88,8 +88,8 @@ class MainActivity : AppCompatActivity() {
     private var isCalibrating = false
     @Volatile private var latestFrameEnergy = 0f
 
-    private val audioBufferSize = sampleRate * 3
-    private val audioCircularBuffer = FloatArray(audioBufferSize)
+    private var audioBufferSize = sampleRate * 3
+    private var audioCircularBuffer = FloatArray(audioBufferSize)
     @Volatile private var audioWriteIndex = 0
 
     private val hannWindow = FloatArray(fftSize) { i ->
@@ -159,6 +159,8 @@ class MainActivity : AppCompatActivity() {
 
         findViewById<android.view.ViewGroup>(android.R.id.content).post {
             updateAllLabelPositions()
+            fitSpinner(micSpinner)
+            colorSpinner?.let { styleColorSpinner(it, prefs.getInt("color_scheme", 0)) }
         }
 
         applyAutoSizeText(findViewById(android.R.id.content))
@@ -412,11 +414,11 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /** Borrowed COLOR-control appearance (from FFTT02M): caption "COLOR", text=high-value color, bg=low-value color. */
+    /** Borrowed COLOR-control appearance (from FFTT02M): caption "COLOR", text=low-value color, bg=high-value color (REVERSED). */
     private fun styleColorSpinner(spinner: Spinner, schemeIdx: Int) {
         spinner.post {
-            val bg = fftHeatMap.lowColorFor(schemeIdx)
-            val fg = fftHeatMap.highColorFor(schemeIdx)
+            val bg = fftHeatMap.highColorFor(schemeIdx)
+            val fg = fftHeatMap.lowColorFor(schemeIdx)
             spinner.setBackgroundColor(bg)
             (spinner.selectedView as? android.widget.TextView)?.apply {
                 setTextColor(fg)
@@ -690,35 +692,37 @@ class MainActivity : AppCompatActivity() {
         }
 
         var encoding = AudioFormat.ENCODING_PCM_FLOAT
-        var minBufferSize = AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, encoding)
-        var bufferSize = max(minBufferSize, fftSize * 4)
-        
-        fun tryInitRecord(src: Int, enc: Int, size: Int): AudioRecord? {
-            return try {
-                val r = AudioRecord(src, sampleRate, AudioFormat.CHANNEL_IN_MONO, enc, size)
-                if (r.state != AudioRecord.STATE_INITIALIZED) {
-                    r.release()
-                    null
-                } else r
-            } catch (e: Exception) { 
-                android.util.Log.e("FFTT04M", "Failed to init AudioRecord (src=$src, enc=$enc): ${e.message}")
-                null 
+        var tryRates = intArrayOf(44100, 16000)
+        var record: AudioRecord? = null
+        var activeRate = 44100
+
+        outer@for (rate in tryRates) {
+            val encs = if (rate == 44100) intArrayOf(AudioFormat.ENCODING_PCM_FLOAT, AudioFormat.ENCODING_PCM_16BIT)
+                       else intArrayOf(AudioFormat.ENCODING_PCM_16BIT)
+            
+            for (enc in encs) {
+                val minSize = AudioRecord.getMinBufferSize(rate, AudioFormat.CHANNEL_IN_MONO, enc)
+                if (minSize <= 0) continue
+                
+                val bufSize = max(minSize, fftSize * (if (enc == AudioFormat.ENCODING_PCM_FLOAT) 4 else 2))
+                val sources = intArrayOf(MediaRecorder.AudioSource.MIC, MediaRecorder.AudioSource.CAMCORDER)
+                
+                for (src in sources) {
+                    try {
+                        val r = AudioRecord(src, rate, AudioFormat.CHANNEL_IN_MONO, enc, bufSize)
+                        if (r.state == AudioRecord.STATE_INITIALIZED) {
+                            record = r
+                            encoding = enc
+                            activeRate = rate
+                            android.util.Log.i("FFTT04M", "Started recording: rate=$rate, enc=$enc, src=$src")
+                            break@outer
+                        }
+                        r.release()
+                    } catch (e: Exception) {
+                        android.util.Log.e("FFTT04M", "Failed AudioRecord init (rate=$rate, enc=$enc, src=$src): ${e.message}")
+                    }
+                }
             }
-        }
-
-        var record = tryInitRecord(MediaRecorder.AudioSource.MIC, encoding, bufferSize)
-
-        if (record == null) {
-            android.util.Log.w("FFTT04M", "PCM_FLOAT recording unavailable or failed to init; trying PCM_16BIT")
-            encoding = AudioFormat.ENCODING_PCM_16BIT
-            minBufferSize = AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, encoding)
-            bufferSize = max(minBufferSize, fftSize * 2)
-            record = tryInitRecord(MediaRecorder.AudioSource.MIC, encoding, bufferSize)
-        }
-
-        if (record == null) {
-            android.util.Log.w("FFTT04M", "MIC source failed; trying CAMCORDER source")
-            record = tryInitRecord(MediaRecorder.AudioSource.CAMCORDER, encoding, bufferSize)
         }
 
         if (record == null) {
@@ -726,12 +730,24 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
+        if (activeRate != sampleRate) {
+            sampleRate = activeRate
+            audioBufferSize = sampleRate * 3
+            audioCircularBuffer = FloatArray(audioBufferSize)
+            audioWriteIndex = 0
+            // Re-init filters for new sample rate
+            filters = Array(5) { i ->
+                BiquadFilter(BiquadFilter.Type.PEAKING, sampleRate.toFloat(), eqBands[i], 1.0f, 0f)
+            }
+            fftHeatMap.setParams(fftSize, sampleRate.toFloat(), stepSize)
+        }
+
         activeEncoding = encoding
-        selectedDevice?.let { record?.setPreferredDevice(it) }
+        selectedDevice?.let { record.setPreferredDevice(it) }
         
         audioRecord = record
         recording.set(true)
-        record?.startRecording()
+        record.startRecording()
 
         recordingThread = Thread {
             val audioBuffer = FloatArray(stepSize)

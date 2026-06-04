@@ -140,6 +140,8 @@ class ViewerActivity : AppCompatActivity() {
     }
 
     private fun updateAllLabelPositions() {
+        if (findViewById<View>(android.R.id.content).width <= 0) return
+
         val sliderFilter = findViewById<Slider>(R.id.vSliderNoiseFilter)
         val sliderRise = findViewById<Slider>(R.id.vSliderNoiseRise)
         val sliderFall = findViewById<Slider>(R.id.vSliderNoiseFall)
@@ -229,6 +231,14 @@ class ViewerActivity : AppCompatActivity() {
 
         setupEqSliders()
         setupViewerTabs()
+        
+        // Initial fitting for non-slider controls
+        findViewById<View>(android.R.id.content).post {
+            fitSpinner(sizeSpinner)
+            fitSpinner(stepSpinner)
+            fitSpinner(blurSpinner)
+            fitSpinner(colorSpinner)
+        }
     }
 
     /**
@@ -280,14 +290,11 @@ class ViewerActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * Borrowed COLOR-control appearance (from FFTT02M): caption "COLOR", text drawn in the
-     * scheme's high-value color, background in the scheme's low-value color.
-     */
+    /** Borrowed COLOR-control appearance (from FFTT02M): caption "COLOR", text=low-value color, bg=high-value color (REVERSED). */
     private fun styleColorSpinner(schemeIdx: Int) {
         colorSpinner.post {
-            val bg = viewerFft.lowColorFor(schemeIdx)
-            val fg = viewerFft.highColorFor(schemeIdx)
+            val bg = viewerFft.highColorFor(schemeIdx)
+            val fg = viewerFft.lowColorFor(schemeIdx)
             colorSpinner.setBackgroundColor(bg)
             (colorSpinner.selectedView as? android.widget.TextView)?.apply {
                 setTextColor(fg)
@@ -385,6 +392,12 @@ class ViewerActivity : AppCompatActivity() {
                 var m = 0
                 for (i in enhanceSelected.indices) if (enhanceSelected[i]) m = m or (1 shl i)
                 prefs.edit { putInt("enhance_mask_v3", m) }
+                updateEnhanceButton()
+                triggerRefresh()
+            }
+            .setNeutralButton("Clear All") { _, _ ->
+                enhanceSelected.fill(false)
+                prefs.edit { putInt("enhance_mask_v3", 0) }
                 updateEnhanceButton()
                 triggerRefresh()
             }
