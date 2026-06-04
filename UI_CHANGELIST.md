@@ -7,14 +7,14 @@ Tracking the UI review requests from 2026-06-04. Status legend: ✅ = done & com
 ---
 
 ## 1. Top control bar (FFT analysis mode)
-- ⬜ 1.1 Move the COLOR spinner out of the top bar (it moves into the Display tab stack — see 2.3)
-- ⬜ 1.2 With COLOR removed, re-review remaining top-bar control sizes and label fonts for best fit
+- ✅ 1.1 Move the COLOR spinner out of the top bar (moved to Display tab)
+- ✅ 1.2 With COLOR removed, re-review remaining top-bar control sizes and label fonts for best fit (set to 0.2 width, 8sp font, 0.11 allowance height)
 
 ## 2. Display tab stack
-- ⬜ 2.1 Remove the superfluous orange Enhance spinner
-- ⬜ 2.2 Move the Blur spinner up into the freed position (it currently sits too far down)
-- ⬜ 2.3 Add the COLOR spinner below Blur
-- ⬜ 2.4 Leave ample empty space below the stack to clear any system control bars
+- ✅ 2.1 Remove the superfluous orange Enhance spinner (hidden/disabled in code)
+- ✅ 2.2 Move the Blur spinner up into the freed position (positioned via dynamic weights)
+- ✅ 2.3 Add the COLOR spinner below Blur (positioned via dynamic weights)
+- ✅ 2.4 Leave ample empty space below the stack to clear any system control bars (0.23 allowance spacer at bottom)
 
 ## 3. FFT display corner labels (Sz / St)
 - ⬜ 3.1 Synchronise the `Sz` / `St` labels (top-right of the spectrogram) with the **live** Size and Step spinner values
@@ -36,4 +36,6 @@ Tracking the UI review requests from 2026-06-04. Status legend: ✅ = done & com
 ---
 
 ## Commit log (most recent first)
-_(entries added as each increment lands)_
+- **Dynamic Height Allocation** (2026-06-03): Restructured Viewer layout with vertical weights (0.11 allowance per item); FFT pinned as square. (Items 1.1-2.4)
+- **Top bar redistribution and Display tab refinement** (2026-06-03): Top buttons set to 0.2 width; Color moved below Blur; all display controls 44dp; Color/Blur fonts synced to 10sp. (Items 1.1, 1.2, 2.3, 2.4)
+- **Hide Enhance spinner; relocate Blur/Color** (2026-06-03): Orange enhance spinner hidden/disabled; Blur moved to top of display-stack; Color positioned below it. (Items 2.1-2.3)

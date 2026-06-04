@@ -176,6 +176,8 @@ class ViewerActivity : AppCompatActivity() {
         colorSpinner = findViewById(R.id.vColorSpinner)
         blurSpinner = findViewById(R.id.vBlurSpinner)
         enhanceSpinner = findViewById(R.id.vEnhanceSpinner)
+        enhanceSpinner.visibility = android.view.View.GONE
+        enhanceSpinner.isEnabled = false
         btnSweep = findViewById(R.id.btnViewerSweep)
 
         findViewById<Button>(R.id.btnViewerGalleryTop).setOnClickListener { finish() }

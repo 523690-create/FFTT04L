@@ -14,6 +14,31 @@ commit per change**, so non-optimal changes can be reverted selectively with
 
 ## Changelog (newest first)
 
+### Dynamic Height Allocation in ViewerActivity (Portrait)
+- What: Restructured `activity_viewer.xml` with a vertical `LinearLayout` root to support dynamic
+  proportional heights on all screen sizes. The FFT display is pinned as a square (1:1), and the
+  remaining vertical "allowance" is divided into units of 0.11 for each: Top Bar, Tab Bar, and the
+  5 Display tab controls (Size, Step, Enhance, Blur, Color). A 0.23 spacer sits at the bottom.
+  Top bar buttons correctly redistributed to 20% width each.
+- Files: `activity_viewer.xml`
+- Revert: `git revert` this commit.
+
+### ViewerActivity UI: Top bar redistribution and Display tab refinement
+- What: Redistributed top control bar buttons to 0.2 width each (layout_weight="20") with optimized
+  8sp bold fonts. In the Display tab, moved the Color spinner immediately below Blur, made all
+  control heights uniform (44dp), and synchronized Color/Blur font sizes (10sp bold) with the
+  Enhance control. Cleaned up redundant color spinner from the top bar. Addresses UI review items 1.1, 1.2, 2.3, 2.4.
+- Files: `activity_viewer.xml`, `spinner_item_gold.xml`, `spinner_item_blur_cyan.xml`
+- Revert: `git revert` this commit.
+
+### Hide Enhance spinner and relocate Blur spinner (UI refinement)
+- What: To reduce clutter in the DISPLAY tab, the orange `vEnhanceSpinner` is now hidden and disabled 
+  (its logic remains for future use/reversion). The `vBlurSpinner` moved up into the freed position 
+  at the top of the lower control group, and the redundant `vColorSpinner` entry was cleaned up so 
+  it now sits directly below Blur. Addresses UI review items 2.1, 2.2, and 2.3.
+- Files: `ViewerActivity.kt`, `activity_viewer.xml`
+- Revert: `git revert` this commit; restore visibility in `ViewerActivity.kt`.
+
 ### Tabbed control panels (Viewer + Wavelet, portrait + landscape)
 - What: All controls are reachable via a Material `TabLayout` that shows one control group at a time
   (lowest-risk approach: reuse the existing control views in place, toggle page visibility — no
