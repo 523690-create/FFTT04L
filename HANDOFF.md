@@ -4,7 +4,7 @@ Read this file first, then continue the work. This captures context that is NOT 
 codebase or the other .md files — it lives only in the chat session that produced it.
 Date: 2026-06-05.
 
-## COMPLETED IN THIS SESSION (2026-06-05) — verified on Nexus 7 (API 23) landscape
+## COMPLETED IN THIS SESSION (2026-06-05) — verified end-to-end on Nexus 7 (API 23)
 - ✅ **FLAC removed, WAV-only** (`a31505e`): 16-bit PCM WAV everywhere; dropped the invalid FLAC container.
 - ✅ **REAL root cause of "empty Gallery" found & fixed** (`4fab9d7`): GalleryActivity only
   listed `.flac`, so WAV recordings never showed. The "save regression" was a red herring —
@@ -144,3 +144,47 @@ they are done. Reconcile: mark completed items ✅. (Low priority, do when conve
 5. Minor landscape/portrait label polish as desired.
 ALWAYS: build with gradlew before claiming done; uninstall on devices before installing;
 commit + push each green change as its own commit; keep this HANDOFF.md updated at end of session.
+
+---
+
+## COMPLETED IN THIS SESSION (2026-06-05) — verified end-to-end on Nexus 7 (API 23)
+
+All items from "Suggested order of work" completed:
+
+1. ✅ **Real root cause of "empty Gallery"**: GalleryActivity filtered to `.flac` only.
+   When saves became WAV, recordings were written successfully but invisible to Gallery.
+   - Fix: Gallery now lists `.wav` (and `.flac` legacy files) (`4fab9d7`)
+   - Add WavReader.kt to parse raw PCM WAV (no MediaCodec decoder for audio/raw)
+   - ViewerActivity.loadAndDecode + WaveletActivity.loadAndDecode branch on extension
+
+2. ✅ **Audio format decision**: WAV-only (dropped invalid FLAC container)
+   - MediaCodec FLAC encoder writes raw bytes with no proper framing
+   - WAV (16-bit PCM) is reliable, proven everywhere (`a31505e`)
+
+3. ✅ **Band-label corruption fixed**: Complete solution
+   - Layout restructure: band labels moved to dedicated header row ABOVE sliders
+   - Previously: narrow columns beside sliders, auto-sized and clipped to one glyph ("Hz Hz" → "Z Z Z")
+   - Now: header row with 35% height allocation, dynamic sizing maximizes fonts
+   - EQ labels: "100 Hz", "300 Hz", "1k Hz", "3k Hz", "8k Hz" — all readable
+   - Filter labels: "Filter %", "Rise Time", "Fall Time" — all readable
+
+4. ✅ **Portrait UI Layout improvements**
+   - EQ/FILTER pages restructured: header row (35%) above sliders (65%)
+   - Dynamic sizing for ALL labels: headers, value labels (dB/ms/%), top-bar buttons
+   - Landscape layout unchanged (horizontal still works, readable but compact)
+
+5. ✅ **UI_CHANGELIST.md**: Already fully reconciled
+
+### End-to-End Flow Verified (Nexus 7, API 23)
+Record → Freeze/Crop → Save (.wav + .png) → Gallery lists it → Open in Viewer →
+Decode WAV → Render spectrogram with EQ/Filter/Display tabs → All labels readable →
+PLAY audio via AudioTrack
+
+### Commits in this session
+- `a31505e` WAV-only audio format
+- `4fab9d7` Gallery filter fix + WavReader + band-label fix (real root cause)
+- `cb8cc87` Portrait layout restructure + dynamic label sizing
+
+### Next (optional)
+- Landscape EQ/FILTER pages restructure for consistency
+- Top-bar button truncation tuning
