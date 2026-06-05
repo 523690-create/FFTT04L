@@ -18,7 +18,8 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:label="@string/title_listening">
+            android:label="@string/title_listening"
+            android:screenOrientation="fullSensor">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -28,21 +29,25 @@
         <activity
             android:name=".GalleryActivity"
             android:exported="false"
-            android:label="@string/title_gallery" />
+            android:label="@string/title_gallery"
+            android:screenOrientation="fullSensor" />
 
         <activity
             android:name=".ViewerActivity"
             android:exported="false"
-            android:label="@string/title_analysis" />
+            android:label="@string/title_analysis"
+            android:screenOrientation="fullSensor" />
 
         <activity
             android:name=".WaveletActivity"
             android:exported="false"
-            android:label="@string/title_wavelet" />
+            android:label="@string/title_wavelet"
+            android:screenOrientation="fullSensor" />
 
         <activity
             android:name=".LatencyActivity"
-            android:exported="false" />
+            android:exported="false"
+            android:screenOrientation="fullSensor" />
 
     </application>
 

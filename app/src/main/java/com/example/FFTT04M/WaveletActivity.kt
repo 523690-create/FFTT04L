@@ -132,7 +132,16 @@ class WaveletActivity : AppCompatActivity() {
 
         waveletView.post {
             updateAllLabelPositions()
+            fitSpinner(colorSpinner)
             filePath?.let { loadAndDecode(File(it)) }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        findViewById<View>(android.R.id.content).post {
+            updateAllLabelPositions()
+            fitSpinner(colorSpinner)
         }
     }
 
@@ -171,13 +180,30 @@ class WaveletActivity : AppCompatActivity() {
         return "rec_$safe"
     }
 
+    private fun fitSpinner(s: Spinner?) {
+        s?.post { (s.selectedView as? TextView)?.let { it.setMaxTextSizeToFit(it.text.toString()) } }
+    }
+
     private fun updateAllLabelPositions() {
+        if (findViewById<View>(android.R.id.content).width <= 0) return
+
         adjustSliderThickness(sliderLevel, txtLevelValue)
         adjustSliderThickness(sliderOrder, txtOrderValue)
         adjustSliderThickness(sliderSampling, txtSamplingValue)
         adjustSliderThickness(sliderThreshold, txtThresholdValue)
         
-        // Color control is a spinner now (styled in setupColorSpinner); no slider tinting needed.
+        // Apply robust auto-sizing to ALL relevant labels to fix "printed too small" issues.
+        val labelsToFit = intArrayOf(
+            R.id.txtLevelValue, R.id.txtOrderValue, R.id.txtSamplingValue, R.id.txtThresholdValue,
+            R.id.lblWavLevel, R.id.lblWavOrder, R.id.lblWavSampling, R.id.lblWavThreshold
+        )
+        for (id in labelsToFit) {
+            val tv = findViewById<TextView>(id) ?: continue
+            if ((tv.visibility == View.VISIBLE) && ((tv.parent as? View)?.width ?: 0 > 0)) {
+                tv.setMaxTextSizeToFit(tv.text.toString())
+            }
+        }
+        updateSafetyStatus()
     }
 
     private fun adjustSliderThickness(slider: Slider, label: TextView?) {
@@ -341,12 +367,13 @@ class WaveletActivity : AppCompatActivity() {
         if (pcm == null || pcm.isEmpty()) { txtSafetyStatus.text = ""; return }
         val ceilingKhz = safeFreqCeiling() / 1000f
         val over = targetFreq > safeFreqCeiling()
-        txtSafetyStatus.text = if (over) {
+        val statusText = if (over) {
             "⚠ ${modeNames[analysisMode]}: FS above safe ${String.format(java.util.Locale.US, "%.1f", ceilingKhz)} kHz — will auto-ease"
         } else {
             "${modeNames[analysisMode]} · safe FS ≤ ${String.format(java.util.Locale.US, "%.1f", ceilingKhz)} kHz"
         }
         txtSafetyStatus.setTextColor(if (over) Color.YELLOW else Color.LTGRAY)
+        txtSafetyStatus.setMaxTextSizeToFit(statusText)
     }
 
     /**

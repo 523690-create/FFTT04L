@@ -11,8 +11,15 @@ commit per change**, so non-optimal changes can be reverted selectively with
   If two engines are selected, the highest-priority one wins (priority: Synchrosqueeze > Reassignment
   > Constant-Q > Sweep+). Post-processors (Gaussian, Bilateral, TV Denoise, Butterworth, Multitaper)
   stack on top. The original additive "Sweep" engine has been removed (see changelog).
+- **Build Convention**: APKs are generated with a timestamp in the project root: `FFTT04M-yyyyMMdd-HHmmss.apk`.
+  Use the PowerShell command documented in `agents.md` to build and rename.
 
 ## Changelog (newest first)
+
+### UI Perfection & Final Multi-Device Stability
+- What: Enabled full 360-degree rotation (`fullSensor`). Added a **CLEAR** button to the Enhance dialog to reset all settings. Reversed colors for all **COLOR** controls (accent bg, base text). Fixed vertical alignment and text wrapping for landscape buttons. Standardized all spinner heights to 44dp. Hardened Nexus 7 recording with a **16kHz** fallback. Optimized text auto-sizing with caching to resolve tablet UI freezes. Corrected Sz/St label logic to keep the larger, clearer version.
+- Files: `AndroidManifest.xml`, `ViewerActivity.kt`, `MainActivity.kt`, `WaveletActivity.kt`, `ViewUtils.kt`, `FFTHeatMapView.kt`, `activity_viewer.xml`, `activity_wavelet.xml`, `layout-land/activity_viewer.xml`
+- Revert: `git revert` this series of commits.
 
 ### Dynamic Height Allocation in ViewerActivity (Portrait)
 - What: Restructured `activity_viewer.xml` with a vertical `LinearLayout` root to support dynamic

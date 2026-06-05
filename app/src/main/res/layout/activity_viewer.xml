@@ -160,43 +160,43 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:orientation="horizontal"
-            android:weightSum="54"
+            android:weightSum="100"
             android:paddingHorizontal="4dp">
-            <!-- (EQ content remains same as before) -->
-            <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="10" android:orientation="vertical">
-                <TextView android:layout_width="wrap_content" android:layout_height="0dp" android:layout_weight="0.4" android:text="@string/label_100hz" android:textColor="#FFFFFF" android:textSize="7sp" android:textStyle="bold" android:gravity="bottom|center_horizontal"/>
+            <!-- 5 bands: 15% width each = 75%. 4 gutters: 5% each = 20%. Total 95% + 5% end padding. -->
+            <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="15" android:orientation="vertical">
+                <TextView android:id="@+id/lblEq100" android:layout_width="wrap_content" android:layout_height="0dp" android:layout_weight="0.4" android:text="@string/label_100hz" android:textColor="#FFFFFF" android:textSize="7sp" android:textStyle="bold" android:gravity="bottom|center_horizontal"/>
                 <FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1.6">
                     <com.google.android.material.slider.Slider android:id="@+id/vEq100" android:layout_width="match_parent" android:layout_height="match_parent" android:valueFrom="-40.0" android:valueTo="40.0" android:value="0.0" android:orientation="vertical" app:labelBehavior="gone" android:stepSize="10.0"/>
                     <TextView android:id="@+id/txtEq100Value" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/label_0db" android:textColor="#000000" android:textSize="8sp" android:textStyle="bold" android:layout_gravity="top|center_horizontal" android:elevation="4dp"/>
                 </FrameLayout>
             </LinearLayout>
-            <View android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
-            <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="10" android:orientation="vertical">
-                <TextView android:layout_width="wrap_content" android:layout_height="0dp" android:layout_weight="0.4" android:text="@string/label_300hz" android:textColor="#FFFFFF" android:textSize="7sp" android:textStyle="bold" android:gravity="bottom|center_horizontal"/>
+            <View android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="5" />
+            <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="15" android:orientation="vertical">
+                <TextView android:id="@+id/lblEq300" android:layout_width="wrap_content" android:layout_height="0dp" android:layout_weight="0.4" android:text="@string/label_300hz" android:textColor="#FFFFFF" android:textSize="7sp" android:textStyle="bold" android:gravity="bottom|center_horizontal"/>
                 <FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1.6">
                     <com.google.android.material.slider.Slider android:id="@+id/vEq300" android:layout_width="match_parent" android:layout_height="match_parent" android:valueFrom="-40.0" android:valueTo="40.0" android:value="0.0" android:orientation="vertical" app:labelBehavior="gone" android:stepSize="10.0"/>
                     <TextView android:id="@+id/txtEq300Value" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/label_0db" android:textColor="#000000" android:textSize="8sp" android:textStyle="bold" android:layout_gravity="top|center_horizontal" android:elevation="4dp"/>
                 </FrameLayout>
             </LinearLayout>
-            <View android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
-            <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="10" android:orientation="vertical">
-                <TextView android:layout_width="wrap_content" android:layout_height="0dp" android:layout_weight="0.4" android:text="@string/label_1khz" android:textColor="#FFFFFF" android:textSize="7sp" android:textStyle="bold" android:gravity="bottom|center_horizontal"/>
+            <View android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="5" />
+            <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="15" android:orientation="vertical">
+                <TextView android:id="@+id/lblEq1k" android:layout_width="wrap_content" android:layout_height="0dp" android:layout_weight="0.4" android:text="@string/label_1khz" android:textColor="#FFFFFF" android:textSize="7sp" android:textStyle="bold" android:gravity="bottom|center_horizontal"/>
                 <FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1.6">
                     <com.google.android.material.slider.Slider android:id="@+id/vEq1k" android:layout_width="match_parent" android:layout_height="match_parent" android:valueFrom="-40.0" android:valueTo="40.0" android:value="0.0" android:orientation="vertical" app:labelBehavior="gone" android:stepSize="10.0"/>
                     <TextView android:id="@+id/txtEq1kValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/label_0db" android:textColor="#000000" android:textSize="8sp" android:textStyle="bold" android:layout_gravity="top|center_horizontal" android:elevation="4dp"/>
                 </FrameLayout>
             </LinearLayout>
-            <View android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
-            <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="10" android:orientation="vertical">
-                <TextView android:layout_width="wrap_content" android:layout_height="0dp" android:layout_weight="0.4" android:text="@string/label_3khz" android:textColor="#FFFFFF" android:textSize="7sp" android:textStyle="bold" android:gravity="bottom|center_horizontal"/>
+            <View android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="5" />
+            <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="15" android:orientation="vertical">
+                <TextView android:id="@+id/lblEq3k" android:layout_width="wrap_content" android:layout_height="0dp" android:layout_weight="0.4" android:text="@string/label_3khz" android:textColor="#FFFFFF" android:textSize="7sp" android:textStyle="bold" android:gravity="bottom|center_horizontal"/>
                 <FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1.6">
                     <com.google.android.material.slider.Slider android:id="@+id/vEq3k" android:layout_width="match_parent" android:layout_height="match_parent" android:valueFrom="-40.0" android:valueTo="40.0" android:value="0.0" android:orientation="vertical" app:labelBehavior="gone" android:stepSize="10.0"/>
                     <TextView android:id="@+id/txtEq3kValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/label_0db" android:textColor="#000000" android:textSize="8sp" android:textStyle="bold" android:layout_gravity="top|center_horizontal" android:elevation="4dp"/>
                 </FrameLayout>
             </LinearLayout>
-            <View android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
-            <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="10" android:orientation="vertical">
-                <TextView android:layout_width="wrap_content" android:layout_height="0dp" android:layout_weight="0.4" android:text="@string/label_8khz" android:textColor="#FFFFFF" android:textSize="7sp" android:textStyle="bold" android:gravity="bottom|center_horizontal"/>
+            <View android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="5" />
+            <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="15" android:orientation="vertical">
+                <TextView android:id="@+id/lblEq8k" android:layout_width="wrap_content" android:layout_height="0dp" android:layout_weight="0.4" android:text="@string/label_8khz" android:textColor="#FFFFFF" android:textSize="7sp" android:textStyle="bold" android:gravity="bottom|center_horizontal"/>
                 <FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1.6">
                     <com.google.android.material.slider.Slider android:id="@+id/vEq8k" android:layout_width="match_parent" android:layout_height="match_parent" android:valueFrom="-40.0" android:valueTo="40.0" android:value="0.0" android:orientation="vertical" app:labelBehavior="gone" android:stepSize="10.0"/>
                     <TextView android:id="@+id/txtEq8kValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/label_0db" android:textColor="#000000" android:textSize="8sp" android:textStyle="bold" android:layout_gravity="top|center_horizontal" android:elevation="4dp"/>
@@ -210,27 +210,28 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:orientation="horizontal"
-            android:weightSum="32"
+            android:weightSum="100"
             android:paddingHorizontal="4dp"
             android:visibility="gone">
-            <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="10" android:orientation="vertical">
-                <TextView android:layout_width="wrap_content" android:layout_height="0dp" android:layout_weight="0.4" android:text="@string/label_filter_percent" android:textColor="#00FFFF" android:textSize="6sp" android:textStyle="bold" android:gravity="bottom|center_horizontal" android:lines="2"/>
+            <!-- 3 bands: 25% width each = 75%. 2 gutters: 8% each = 16%. Total 91% + 9% end padding. -->
+            <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="25" android:orientation="vertical">
+                <TextView android:id="@+id/lblFilterPercent" android:layout_width="wrap_content" android:layout_height="0dp" android:layout_weight="0.4" android:text="@string/label_filter_percent" android:textColor="#00FFFF" android:textSize="6sp" android:textStyle="bold" android:gravity="bottom|center_horizontal" android:lines="2"/>
                 <FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1.6">
                     <com.google.android.material.slider.Slider android:id="@+id/vSliderNoiseFilter" android:layout_width="match_parent" android:layout_height="match_parent" android:valueFrom="0.0" android:valueTo="1.0" android:value="0.0" android:stepSize="0.01" android:orientation="vertical" app:labelBehavior="gone"/>
                     <TextView android:id="@+id/vTxtFilterValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/label_0pct" android:textColor="#000000" android:textSize="8sp" android:textStyle="bold" android:layout_gravity="top|center_horizontal" android:elevation="4dp"/>
                 </FrameLayout>
             </LinearLayout>
-            <View android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
-            <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="10" android:orientation="vertical">
-                <TextView android:layout_width="wrap_content" android:layout_height="0dp" android:layout_weight="0.4" android:text="@string/label_rise_time" android:textColor="#00FFFF" android:textSize="6sp" android:textStyle="bold" android:gravity="bottom|center_horizontal" android:lines="2"/>
+            <View android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="8" />
+            <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="25" android:orientation="vertical">
+                <TextView android:id="@+id/lblFilterRise" android:layout_width="wrap_content" android:layout_height="0dp" android:layout_weight="0.4" android:text="@string/label_rise_time" android:textColor="#00FFFF" android:textSize="6sp" android:textStyle="bold" android:gravity="bottom|center_horizontal" android:lines="2"/>
                 <FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1.6">
                     <com.google.android.material.slider.Slider android:id="@+id/vSliderNoiseRise" android:layout_width="match_parent" android:layout_height="match_parent" android:valueFrom="0.0" android:valueTo="3.0" android:value="1.7" android:stepSize="0.01" android:orientation="vertical" app:labelBehavior="gone"/>
                     <TextView android:id="@+id/vTxtRiseValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/label_0ms" android:textColor="#000000" android:textSize="8sp" android:textStyle="bold" android:layout_gravity="top|center_horizontal" android:elevation="4dp"/>
                 </FrameLayout>
             </LinearLayout>
-            <View android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
-            <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="10" android:orientation="vertical">
-                <TextView android:layout_width="wrap_content" android:layout_height="0dp" android:layout_weight="0.4" android:text="@string/label_fall_time" android:textColor="#00FFFF" android:textSize="6sp" android:textStyle="bold" android:gravity="bottom|center_horizontal" android:lines="2"/>
+            <View android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="8" />
+            <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="25" android:orientation="vertical">
+                <TextView android:id="@+id/lblFilterFall" android:layout_width="wrap_content" android:layout_height="0dp" android:layout_weight="0.4" android:text="@string/label_fall_time" android:textColor="#00FFFF" android:textSize="6sp" android:textStyle="bold" android:gravity="bottom|center_horizontal" android:lines="2"/>
                 <FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1.6">
                     <com.google.android.material.slider.Slider android:id="@+id/vSliderNoiseFall" android:layout_width="match_parent" android:layout_height="match_parent" android:valueFrom="0.0" android:valueTo="3.0" android:value="2.3" android:stepSize="0.01" android:orientation="vertical" app:labelBehavior="gone"/>
                     <TextView android:id="@+id/vTxtFallValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/label_0ms" android:textColor="#000000" android:textSize="8sp" android:textStyle="bold" android:layout_gravity="top|center_horizontal" android:elevation="4dp"/>
@@ -254,6 +255,7 @@
                 android:layout_height="0dp"
                 android:layout_weight="0.11"
                 android:layout_marginBottom="2dp"
+                android:background="@android:color/transparent"
                 android:overlapAnchor="false" />
 
             <Spinner
@@ -262,6 +264,7 @@
                 android:layout_height="0dp"
                 android:layout_weight="0.11"
                 android:layout_marginBottom="2dp"
+                android:background="@android:color/transparent"
                 android:overlapAnchor="false" />
 
             <Button
@@ -294,6 +297,7 @@
                 android:layout_height="0dp"
                 android:layout_weight="0.11"
                 android:layout_marginBottom="2dp"
+                android:background="@android:color/transparent"
                 android:overlapAnchor="false" />
 
             <Spinner

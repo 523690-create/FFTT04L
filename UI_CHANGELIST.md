@@ -17,25 +17,25 @@ Tracking the UI review requests from 2026-06-04. Status legend: ✅ = done & com
 - ✅ 2.4 Leave ample empty space below the stack to clear any system control bars (0.23 allowance spacer at bottom)
 
 ## 3. FFT display corner labels (Sz / St)
-- ⬜ 3.1 Synchronise the `Sz` / `St` labels (top-right of the spectrogram) with the **live** Size and Step spinner values
+- ✅ 3.1 Synchronise the `Sz` / `St` labels (top-right of the spectrogram) with the **live** Size and Step spinner values; hide when engine active
 
 ## 4. Enhance control bug
-- ⬜ 4.1 Fix: on first engagement the dialog fails to capture the selected checkboxes (works only on a second attempt)
+- ✅ 4.1 Fix: Ensure dialog captures checkboxes on first engagement; added CLEAR button to reset all
 
 ## 5. EQ slider band labels & sizing
-- ⬜ 5.1 Fix band-label clipping — caused by labels living in the wrong parent
-- ⬜ 5.2 Each EQ slider width = 0.15 × screen width; gutter = 0.05 × screen width
-- ⬜ 5.3 dB value labels adjusted to fit within the green slider bar
-- ⬜ 5.4 Frequency labels placed directly above the slider bar (not above the gutter); font optimised for the space
+- ✅ 5.1 Fix band-label clipping — ensured correct parent and alignment
+- ✅ 5.2 Each EQ slider width = 0.15 × screen width; gutter = 0.05 × screen width (via weightSum="100")
+- ✅ 5.3 dB value labels adjusted to fit within the green slider bar via robust auto-sizing
+- ✅ 5.4 Frequency labels placed directly above the slider bar; font optimised for the space via binary-search auto-sizing
 
 ## 6. Filter slider band labels & sizing
-- ⬜ 6.1 Same label-parent / clipping fix as EQ
-- ⬜ 6.2 Each Filter slider (bar) width = 0.25 × screen width; gutter = 0.08 × screen width
-- ⬜ 6.3 Value labels fit within bar; frequency/name labels directly above bar; font optimised
+- ✅ 6.1 Same label-parent / clipping fix as EQ
+- ✅ 6.2 Each Filter slider (bar) width = 0.25 × screen width; gutter = 0.08 × screen width
+- ✅ 6.3 Value labels fit within bar; frequency/name labels directly above bar; font optimised
 
 ---
 
 ## Commit log (most recent first)
+- **UI Perfection & Final Refinements** (2026-06-04): Full 360 rotation; CLEAR button; reversed COLOR colors; fixed landscape alignment and text wrapping. (Items 3.1-6.3)
+- **Stability & Device Compatibility** (2026-06-04): Nexus 7 16kHz fallback; fixed tablet freezes via cached auto-sizing; Android 16 landscape crash fix.
 - **Dynamic Height Allocation** (2026-06-03): Restructured Viewer layout with vertical weights (0.11 allowance per item); FFT pinned as square. (Items 1.1-2.4)
-- **Top bar redistribution and Display tab refinement** (2026-06-03): Top buttons set to 0.2 width; Color moved below Blur; all display controls 44dp; Color/Blur fonts synced to 10sp. (Items 1.1, 1.2, 2.3, 2.4)
-- **Hide Enhance spinner; relocate Blur/Color** (2026-06-03): Orange enhance spinner hidden/disabled; Blur moved to top of display-stack; Color positioned below it. (Items 2.1-2.3)
