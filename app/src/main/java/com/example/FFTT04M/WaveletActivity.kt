@@ -504,7 +504,8 @@ class WaveletActivity : AppCompatActivity() {
     }
 
     private fun setupControls() {
-        val families = arrayOf("DAUB", "SYM", "COIF")
+        // Full descriptive names now that each spinner has its own full-width row.
+        val families = arrayOf("Daubechies", "Symlet", "Coiflet")
         val familyAdapter = ArrayAdapter(this, R.layout.spinner_item, families)
         familyAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         familySpinner.adapter = familyAdapter
@@ -520,7 +521,7 @@ class WaveletActivity : AppCompatActivity() {
             override fun onNothingSelected(p0: AdapterView<*>?) {}
         }
 
-        val boundaries = arrayOf("ZERO", "PER", "SYM")
+        val boundaries = arrayOf("Zero-padding", "Periodic", "Symmetric")
         val boundaryAdapter = ArrayAdapter(this, R.layout.spinner_item, boundaries)
         boundaryAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         boundarySpinner.adapter = boundaryAdapter
@@ -537,7 +538,9 @@ class WaveletActivity : AppCompatActivity() {
 
         // Analysis mode: one exclusive choice (DWT / WPT / CWT / RECON) replacing the old trio of
         // independent checkboxes, which let users tick combinations the dispatch silently ignored.
-        val modeAdapter = ArrayAdapter(this, R.layout.spinner_item, modeNames)
+        // Descriptive labels for the spinner; modeNames stays short for the safety status line.
+        val modeDescriptions = arrayOf("DWT (Discrete)", "WPT (Packet)", "CWT (Continuous)", "Reconstruct")
+        val modeAdapter = ArrayAdapter(this, R.layout.spinner_item, modeDescriptions)
         modeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         modeSpinner.adapter = modeAdapter
         modeSpinner.setSelection(analysisMode)

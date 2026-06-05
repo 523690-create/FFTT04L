@@ -261,3 +261,4 @@ a screen that now looks fine. Confirm intent next session.
   - WavReader.kt: parses raw PCM WAV (no MediaCodec, no container specs)
   - ViewUtils.kt: applyAutoSizeText() walks layout tree, skips EQ/Filter headers; updateAllLabelPositions() dynamically sizes all labels
 - Current state: portrait EQ/Filter working well (headers above sliders with dynamic sizing); landscape still side-by-side (readable but compact); Pixel 3 has label readability issues
+

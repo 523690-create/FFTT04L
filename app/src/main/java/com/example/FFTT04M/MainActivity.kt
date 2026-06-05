@@ -116,8 +116,7 @@ class MainActivity : AppCompatActivity() {
         eqSlidersLayout = findViewById(R.id.eqSlidersLayout)
         filterControlsLayout = findViewById(R.id.filterControlsLayout)
         btnLatency = findViewById(R.id.btnLatency)
-        btnLatency?.isAllCaps = false
-        
+
         mainButtonsLayout = findViewById(R.id.mainButtonsLayout)
         micAndColorLayout = findViewById(R.id.micAndColorLayout)
         sliderNoiseFilter = findViewById(R.id.sliderNoiseFilter)

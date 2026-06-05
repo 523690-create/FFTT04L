@@ -56,12 +56,14 @@
             android:overlapAnchor="false" />
     </LinearLayout>
 
+    <!-- Display gets a fixed 55% of screen height; the remaining ~45% holds the top bar,
+         tab bar, and controls. (Guideline below is now unused but kept to avoid churn.) -->
     <com.example.FFTT04M.WaveletView
         android:id="@+id/waveletView"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:background="#111111"
-        app:layout_constraintBottom_toTopOf="@+id/waveletGuideline"
+        app:layout_constraintHeight_percent="0.55"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/wCustomToolbar" />
@@ -84,7 +86,7 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/waveletGuideline">
+        app:layout_constraintTop_toBottomOf="@+id/waveletView">
 
         <com.google.android.material.tabs.TabLayout
             android:id="@+id/waveletTabs"
@@ -148,13 +150,13 @@
 
                     <!-- THRESH on its own line -->
                     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:paddingHorizontal="4dp" android:layout_marginTop="2dp">
-                        <TextView android:layout_width="80dp" android:layout_height="wrap_content" android:text="THRESH:" android:textColor="#AAAAAA" android:textSize="13sp" android:textStyle="bold"/>
+                        <TextView android:layout_width="80dp" android:layout_height="wrap_content" android:text="Threshold" android:textColor="#AAAAAA" android:textSize="13sp" android:textStyle="bold" android:maxLines="1"/>
                         <CheckBox android:id="@+id/checkSoftThresh" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="SOFT" android:textColor="#FFFFFF" android:buttonTint="#FFFFFF" android:textSize="14sp" android:layout_marginStart="8dp" />
                     </LinearLayout>
 
                     <!-- VIEW on its own line -->
                     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:paddingHorizontal="4dp" android:layout_marginTop="2dp">
-                        <TextView android:layout_width="80dp" android:layout_height="wrap_content" android:text="VIEW:" android:textColor="#AAAAAA" android:textSize="13sp" android:textStyle="bold"/>
+                        <TextView android:layout_width="80dp" android:layout_height="wrap_content" android:text="View" android:textColor="#AAAAAA" android:textSize="13sp" android:textStyle="bold" android:maxLines="1"/>
                         <CheckBox android:id="@+id/checkLogScale" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="LOG" android:textColor="#FFFFFF" android:buttonTint="#FFFFFF" android:textSize="14sp" android:layout_marginStart="8dp" android:layout_marginEnd="20dp" />
                         <CheckBox android:id="@+id/checkLocalNorm" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="L-NORM" android:textColor="#FFFFFF" android:buttonTint="#FFFFFF" android:textSize="14sp" />
                     </LinearLayout>

@@ -8,15 +8,16 @@
     android:clipChildren="false"
     android:clipToPadding="false">
 
-    <!-- Row 1: Title and QUIT (4% Height) -->
+    <!-- Row 1: Title and QUIT (Quit = 0.3 screen width, same style as FFT-viewer top bar) -->
     <LinearLayout
         android:id="@+id/customToolbar"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingHorizontal="16dp"
-        app:layout_constraintHeight_percent="0.04"
+        android:paddingHorizontal="4dp"
+        android:weightSum="100"
+        app:layout_constraintHeight_percent="0.05"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
@@ -24,19 +25,21 @@
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
+            android:layout_weight="70"
             android:text="@string/title_listening"
             style="@style/TextHeading" />
 
         <Button
             android:id="@+id/btnQuitTop"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
+            android:layout_weight="30"
             android:text="@string/btn_quit"
             android:backgroundTint="#FF0000"
             android:textColor="#FFFFFF"
-            android:textSize="11sp"
+            android:textSize="8sp"
             android:textStyle="bold"
+            android:padding="0dp"
             android:insetTop="0dp"
             android:insetBottom="0dp"
             android:minHeight="0dp"
@@ -51,33 +54,22 @@
         app:layout_constraintHeight_percent="0.01"
         app:layout_constraintTop_toBottomOf="@+id/customToolbar" />
 
-    <!-- Row 2: Mic and Color (4% Height) -->
+    <!-- Row 2: Mic spinner on its own full-width line -->
     <LinearLayout
         android:id="@+id/micAndColorLayout"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:orientation="horizontal"
         android:paddingHorizontal="4dp"
-        android:weightSum="100"
-        app:layout_constraintHeight_percent="0.04"
+        app:layout_constraintHeight_percent="0.05"
         app:layout_constraintTop_toBottomOf="@+id/gutterTop"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
         <Spinner
             android:id="@+id/micSpinner"
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:layout_weight="65"
-            android:layout_marginEnd="2dp"
-            android:background="@android:color/transparent"
-            android:overlapAnchor="false" />
-        <Spinner
-            android:id="@+id/colorSpinner"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="35"
-            android:layout_marginStart="2dp"
             android:background="@android:color/transparent"
             android:overlapAnchor="false" />
     </LinearLayout>
@@ -90,15 +82,16 @@
         app:layout_constraintHeight_percent="0.01"
         app:layout_constraintTop_toBottomOf="@+id/micAndColorLayout" />
 
-    <!-- Row 3: Latency and Gallery (4% Height) -->
+    <!-- Row 3: Latency (0.4) + Color (0.3) + Gallery (0.3), FFT-viewer top-bar button style -->
     <LinearLayout
         android:id="@+id/mainButtonsLayout"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:orientation="horizontal"
+        android:gravity="center_vertical"
         android:paddingHorizontal="4dp"
         android:weightSum="100"
-        app:layout_constraintHeight_percent="0.04"
+        app:layout_constraintHeight_percent="0.05"
         app:layout_constraintTop_toBottomOf="@+id/gutterMid"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
@@ -107,16 +100,27 @@
             android:id="@+id/btnLatency"
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_weight="70"
+            android:layout_weight="40"
             android:text="@string/btn_latency"
             android:backgroundTint="#D3D3D3"
             android:textColor="#000000"
             android:layout_marginEnd="2dp"
-            android:textSize="11sp"
+            android:textSize="8sp"
             android:textStyle="bold"
+            android:padding="0dp"
             android:insetTop="0dp"
             android:insetBottom="0dp"
-            android:minHeight="0dp" />
+            android:minHeight="0dp"
+            style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
+
+        <Spinner
+            android:id="@+id/colorSpinner"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="30"
+            android:layout_marginHorizontal="2dp"
+            android:background="@android:color/transparent"
+            android:overlapAnchor="false" />
 
         <Button
             android:id="@+id/btnGallery"
@@ -127,11 +131,13 @@
             android:backgroundTint="#FFFF00"
             android:textColor="#000000"
             android:layout_marginStart="2dp"
-            android:textSize="11sp"
+            android:textSize="8sp"
             android:textStyle="bold"
+            android:padding="0dp"
             android:insetTop="0dp"
             android:insetBottom="0dp"
-            android:minHeight="0dp" />
+            android:minHeight="0dp"
+            style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
     </LinearLayout>
 
     <!-- Gutter 3: 1% Height -->
