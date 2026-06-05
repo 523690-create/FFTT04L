@@ -148,11 +148,11 @@ class ViewerActivity : AppCompatActivity() {
         val txtFilterValue = findViewById<TextView>(R.id.vTxtFilterValue)
         val txtRiseValue = findViewById<TextView>(R.id.vTxtRiseValue)
         val txtFallValue = findViewById<TextView>(R.id.vTxtFallValue)
-        
+
         if (sliderFilter != null) adjustSliderThickness(sliderFilter, txtFilterValue)
         if (sliderRise != null) adjustSliderThickness(sliderRise, txtRiseValue)
         if (sliderFall != null) adjustSliderThickness(sliderFall, txtFallValue)
-        
+
         val eqIds = intArrayOf(R.id.vEq100, R.id.vEq300, R.id.vEq1k, R.id.vEq3k, R.id.vEq8k)
         val eqLabels = intArrayOf(R.id.txtEq100Value, R.id.txtEq300Value, R.id.txtEq1kValue, R.id.txtEq3kValue, R.id.txtEq8kValue)
         for (i in eqIds.indices) {
@@ -163,13 +163,17 @@ class ViewerActivity : AppCompatActivity() {
             }
         }
 
-        // Auto-size the slider VALUE labels and top-bar buttons. The EQ/Filter frequency HEADER
-        // labels (lblEq*, lblFilter*) are deliberately excluded: fitting them against the narrow
-        // column width picks a wrong size from stale dims and blows the text up to a clipped glyph
-        // ("100Hz" -> "Hz"). They keep their fixed XML textSize instead.
+        // Dynamically size ALL labels: band headers, value labels, and top-bar buttons
         val labelsToFit = intArrayOf(
+            // EQ band headers (now in a dedicated row with ample space)
+            R.id.lblEq100, R.id.lblEq300, R.id.lblEq1k, R.id.lblEq3k, R.id.lblEq8k,
+            // Filter band headers
+            R.id.lblFilterPercent, R.id.lblFilterRise, R.id.lblFilterFall,
+            // EQ value labels (dB inside sliders)
             R.id.txtEq100Value, R.id.txtEq300Value, R.id.txtEq1kValue, R.id.txtEq3kValue, R.id.txtEq8kValue,
+            // Filter value labels (% and ms inside sliders)
             R.id.vTxtFilterValue, R.id.vTxtRiseValue, R.id.vTxtFallValue,
+            // Top-bar buttons
             R.id.btnViewerGalleryTop, R.id.btnViewerListenTop, R.id.btnViewerWavelet, R.id.btnViewerNote, R.id.btnViewerPlay
         )
         for (id in labelsToFit) {
