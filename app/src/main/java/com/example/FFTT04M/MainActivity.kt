@@ -272,21 +272,29 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * Persist the captured fragment. Prefers FLAC; if the FLAC encoder is unavailable on this
-     * device/SDK or encoding throws for any reason, transparently falls back to a WAV file.
-     * Returns the file actually written, or null if both paths failed.
+     * Persist the captured fragment. For legacy devices (API < 26), prefers WAV; tries FLAC
+     * as fallback. For modern devices, prefers FLAC with WAV fallback.
+     * Returns the file actually written, or null if all paths failed.
      */
     private fun saveFragmentAudio(dir: File?, timestamp: String, data: FloatArray): File? {
-        // Legacy devices (API < 26): skip FLAC entirely and write WAV directly.
-        // Older audio stacks produce unreliable/invalid container output via MediaCodec FLAC,
-        // so we go straight to the proven 16-bit PCM WAV writer instead of waiting for failure.
         if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.O) {
+            // Legacy devices: try WAV first (fast, reliable), then FLAC as fallback.
             val legacyWav = File(dir, "$timestamp.wav")
-            return try {
+            try {
                 encodeWav(legacyWav, data)
-                legacyWav
+                return legacyWav
             } catch (e: Throwable) {
-                android.util.Log.e("FFTT04M", "Legacy WAV encoding failed: ${e.message}")
+                android.util.Log.w("FFTT04M", "Legacy WAV encoding failed (${e.message}); attempting FLAC fallback")
+                try { if (legacyWav.exists()) legacyWav.delete() } catch (_: Throwable) {}
+            }
+            // Try FLAC even on legacy, in case it's available
+            val legacyFlac = File(dir, "$timestamp.flac")
+            return try {
+                encodeFlac(legacyFlac, data)
+                legacyFlac
+            } catch (e: Throwable) {
+                android.util.Log.e("FFTT04M", "Legacy FLAC fallback also failed: ${e.message}")
+                try { if (legacyFlac.exists()) legacyFlac.delete() } catch (_: Throwable) {}
                 null
             }
         }
