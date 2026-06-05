@@ -185,13 +185,35 @@ PLAY audio via AudioTrack
 - `4fab9d7` Gallery filter fix + WavReader + band-label fix (real root cause)
 - `cb8cc87` Portrait layout restructure + dynamic label sizing
 
+### SESSION 2 (2026-06-05 cont.) — Font/label overhaul, verified on BOTH devices
+Devices: Nexus 7 (API 23, razor, native landscape) + Pixel 3a XL (API 32, bonito).
+(The "Pixel 10" in older notes is actually this Pixel 3a XL.)
+
+Central fix in ViewUtils.setMaxTextSizeToFit (`8b51e4b`, `893dbdb`):
+1. Size text to the view's OWN allocated box when its dimensions are determinate
+   (match_parent / 0dp+weight); only fall back to parent for wrap_content. Fixes
+   Viewer-landscape EQ "Hz Hz Z Z Z" (label parent was the tall column → font ballooned
+   → clipped) AND top-bar button truncation (sized to whole toolbar → ellipsis).
+2. Subtract content padding so text fits the drawable area, not the raw box.
+3. measureText (not getTextBounds) so Material-button letterSpacing is counted.
+4. Pin maxLines to the \n line count so text never spills to an extra line / per-char wrap.
+
+Layout/code (`5688c14`):
+- MainActivity band labels: maxLines="2" (both orientations); dB value labels now
+  dynamic (was fixed 8sp).
+
+VERIFIED:
+- Pixel 3a landscape MainActivity ("Listen"): band labels + "0 dB" readable. ✓
+- Pixel 3a landscape Viewer ("FFT analysis"): EQ labels readable, top bar
+  "GALLERY LISTEN WAVELET NOTE PLAY" full (no truncation). ✓
+- Nexus 7 landscape Viewer: EQ labels readable, "GALLERY LISTEN NOTE PLAY" full. ✓
+
 ### Next (optional)
-- Landscape EQ/FILTER pages restructure for consistency
-- Top-bar button truncation tuning
-- Pixel 3 label readability: Listen tab and FFT landscape have unreadable labels
-- Wavelet UI quick fixes needed
-- Review slider value font logic for edge cases
-- Review button/control font logic, especially text overflows
+- Wavelet UI: "safe FS ≤ 206.7 k…" status text truncates; SLIDERS header labels
+  slightly clipped at top (see HANDOFF UI item 3). Quick fixes pending.
+- API downgrade analysis (deferred to future session per user): can reach API 15
+  with no functional loss; TextViewCompat autosize needs <26 guard (already present).
+- dB value labels in Nexus 7 viewer sliders render small — could enlarge.
 
 ### API Downgrade Analysis (API 23 → 15)
 **Current min: API 23 (Nexus 7)**
