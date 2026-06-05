@@ -208,12 +208,24 @@ VERIFIED:
   "GALLERY LISTEN WAVELET NOTE PLAY" full (no truncation). ✓
 - Nexus 7 landscape Viewer: EQ labels readable, "GALLERY LISTEN NOTE PLAY" full. ✓
 
+### Wavelet status (re-verified on Pixel 3a landscape this session)
+The central font fix (`8b51e4b`) already resolved the previously-flagged Wavelet issues:
+- SETUP "DWT · safe FS ≤ … kHz" status now renders in FULL (was truncated).
+- SLIDERS header row "LVL ORD FS THR" renders cleanly (was clipped at top).
+- Top bar "GALLERY LISTEN COLOR" full.
+Remaining MINOR edge case (not yet fixed): the ORD slider's value number is clipped
+when the thumb is at the slider MINIMUM (value label translated below the FrameLayout).
+Same value-label-positioning logic as the EQ value labels. Low priority. Asked the user
+which Wavelet fix they wanted (#4) but got no answer — left untouched to avoid regressing
+a screen that now looks fine. Confirm intent next session.
+
 ### Next (optional)
-- Wavelet UI: "safe FS ≤ 206.7 k…" status text truncates; SLIDERS header labels
-  slightly clipped at top (see HANDOFF UI item 3). Quick fixes pending.
-- API downgrade analysis (deferred to future session per user): can reach API 15
-  with no functional loss; TextViewCompat autosize needs <26 guard (already present).
-- dB value labels in Nexus 7 viewer sliders render small — could enlarge.
+- Wavelet ORD value-label clipping at slider minimum (see above) — needs careful
+  updateLabelPosition clamp + on-device test.
+- API downgrade analysis (deferred per user): can reach API 15 with no functional loss;
+  TextViewCompat autosize already guarded for <26.
+- dB value labels in Nexus 7 viewer sliders render small — could enlarge (cap is 14sp).
+- Portrait Pixel 3a not re-screenshotted this session (only landscape); spot-check next time.
 
 ### API Downgrade Analysis (API 23 → 15)
 **Current min: API 23 (Nexus 7)**
