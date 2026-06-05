@@ -163,24 +163,32 @@ class ViewerActivity : AppCompatActivity() {
             }
         }
 
-        // Dynamically size ALL labels: band headers, value labels, and top-bar buttons
-        val labelsToFit = intArrayOf(
-            // EQ band headers (now in a dedicated row with ample space)
-            R.id.lblEq100, R.id.lblEq300, R.id.lblEq1k, R.id.lblEq3k, R.id.lblEq8k,
-            // Filter band headers
-            R.id.lblFilterPercent, R.id.lblFilterRise, R.id.lblFilterFall,
-            // EQ value labels (dB inside sliders)
-            R.id.txtEq100Value, R.id.txtEq300Value, R.id.txtEq1kValue, R.id.txtEq3kValue, R.id.txtEq8kValue,
-            // Filter value labels (% and ms inside sliders)
-            R.id.vTxtFilterValue, R.id.vTxtRiseValue, R.id.vTxtFallValue,
-            // Top-bar buttons
-            R.id.btnViewerGalleryTop, R.id.btnViewerListenTop, R.id.btnViewerWavelet, R.id.btnViewerNote, R.id.btnViewerPlay
-        )
-        for (id in labelsToFit) {
+        // Dynamically size labels with size caps to prevent portrait bloat
+        val headerIds = intArrayOf(R.id.lblEq100, R.id.lblEq300, R.id.lblEq1k, R.id.lblEq3k, R.id.lblEq8k, R.id.lblFilterPercent, R.id.lblFilterRise, R.id.lblFilterFall)
+        val valueIds = intArrayOf(R.id.txtEq100Value, R.id.txtEq300Value, R.id.txtEq1kValue, R.id.txtEq3kValue, R.id.txtEq8kValue, R.id.vTxtFilterValue, R.id.vTxtRiseValue, R.id.vTxtFallValue)
+        val buttonIds = intArrayOf(R.id.btnViewerGalleryTop, R.id.btnViewerListenTop, R.id.btnViewerWavelet, R.id.btnViewerNote, R.id.btnViewerPlay)
+
+        // Cap header labels to 11sp (band names like "100 Hz")
+        for (id in headerIds) {
             val tv = findViewById<TextView>(id) ?: continue
-            // Only fit if visible and has a parent with dimensions.
             if ((tv.visibility == View.VISIBLE) && ((tv.parent as? View)?.width ?: 0 > 0)) {
-                tv.setMaxTextSizeToFit(tv.text.toString())
+                tv.setMaxTextSizeToFit(tv.text.toString(), maxSizeSp = 11f)
+            }
+        }
+
+        // Cap value labels to 12sp (dB, %, ms values)
+        for (id in valueIds) {
+            val tv = findViewById<TextView>(id) ?: continue
+            if ((tv.visibility == View.VISIBLE) && ((tv.parent as? View)?.width ?: 0 > 0)) {
+                tv.setMaxTextSizeToFit(tv.text.toString(), maxSizeSp = 12f)
+            }
+        }
+
+        // Cap button labels to 10sp
+        for (id in buttonIds) {
+            val tv = findViewById<TextView>(id) ?: continue
+            if ((tv.visibility == View.VISIBLE) && ((tv.parent as? View)?.width ?: 0 > 0)) {
+                tv.setMaxTextSizeToFit(tv.text.toString(), maxSizeSp = 10f)
             }
         }
     }
@@ -1627,17 +1635,19 @@ class ViewerActivity : AppCompatActivity() {
         // If the view is effectively hidden (GONE), skip to avoid infinite layout loops.
         if (slider.isGone || label.isGone) return
 
-        // Ensure dimensions and layout are ready
+        // Ensure dimensions and layout are ready. Defer via a SINGLE guarded post — never an
+        // OnGlobalLayoutListener: on a tab switch many labels are height-0 at once, and a listener
+        // that calls requestLayout() re-triggers every other still-registered listener, cascading
+        // into a layout storm / ANR (the tab-switch freeze). The post runs after this layout pass,
+        // by which point the now-visible slider has a height; the pending flag prevents stacking.
         if (slider.height == 0 || label.height == 0 || label.layout == null) {
-            label.viewTreeObserver.addOnGlobalLayoutListener(object : ViewTreeObserver.OnGlobalLayoutListener {
-                override fun onGlobalLayout() {
-                    if (label.height > 0 && label.layout != null && slider.height > 0) {
-                        label.viewTreeObserver.removeOnGlobalLayoutListener(this)
-                        updateLabelPosition(slider, label)
-                    }
+            if (label.getTag(R.id.tag_pos_pending) != true) {
+                label.setTag(R.id.tag_pos_pending, true)
+                label.post {
+                    label.setTag(R.id.tag_pos_pending, null)
+                    updateLabelPosition(slider, label)
                 }
-            })
-            label.post { updateLabelPosition(slider, label) }
+            }
             return
         }
 

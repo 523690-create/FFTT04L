@@ -608,7 +608,10 @@ class MainActivity : AppCompatActivity() {
                 it.gravity = android.view.Gravity.CENTER
                 it.setPadding(0, (2f * density).toInt(), 0, 0)
                 // Dynamically size the value text to fit the column (replaces the old fixed 8sp).
-                it.setMaxTextSizeToFit(it.text.toString(), maxSizeSp = 14f)
+                // Landscape gives each EQ bar far more room, so allow a much larger cap there;
+                // portrait columns are narrow, so keep the smaller cap to avoid over-bloating.
+                val isLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+                it.setMaxTextSizeToFit(it.text.toString(), maxSizeSp = if (isLandscape) 28f else 14f)
             }
 
             updateLabelPosition(slider, label)
