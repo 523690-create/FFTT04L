@@ -16,6 +16,11 @@ commit per change**, so non-optimal changes can be reverted selectively with
 
 ## Changelog (newest first)
 
+### UI Perfection & Final Multi-Device Stability
+- What: Enabled full 360-degree rotation (`fullSensor`). Added a **CLEAR** button to the Enhance dialog to reset all settings. Reversed colors for all **COLOR** controls (accent bg, base text). Fixed vertical alignment and text wrapping for landscape buttons. Standardized all spinner heights to 44dp. Hardened Nexus 7 recording with a **16kHz** fallback. Optimized text auto-sizing with caching to resolve tablet UI freezes. Corrected Sz/St label logic to keep the larger, clearer version.
+- Files: `AndroidManifest.xml`, `ViewerActivity.kt`, `MainActivity.kt`, `WaveletActivity.kt`, `ViewUtils.kt`, `FFTHeatMapView.kt`, `activity_viewer.xml`, `activity_wavelet.xml`, `layout-land/activity_viewer.xml`
+- Revert: `git revert` this series of commits.
+
 ### Dynamic Height Allocation in ViewerActivity (Portrait)
 - What: Restructured `activity_viewer.xml` with a vertical `LinearLayout` root to support dynamic
   proportional heights on all screen sizes. The FFT display is pinned as a square (1:1), and the
