@@ -272,47 +272,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * Persist the captured fragment. For legacy devices (API < 26), prefers WAV; tries FLAC
-     * as fallback. For modern devices, prefers FLAC with WAV fallback.
-     * Returns the file actually written, or null if all paths failed.
+     * Persist the captured fragment as 16-bit PCM WAV (works reliably on all devices).
+     * Returns the file written, or null if encoding failed.
+     *
+     * FLAC container format is broken in the MediaCodec FLAC encoder (writes raw bytes with no
+     * BUFFER_FLAG_CODEC_CONFIG handling), so we use WAV exclusively for consistency and reliability.
      */
     private fun saveFragmentAudio(dir: File?, timestamp: String, data: FloatArray): File? {
-        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.O) {
-            // Legacy devices: try WAV first (fast, reliable), then FLAC as fallback.
-            val legacyWav = File(dir, "$timestamp.wav")
-            try {
-                encodeWav(legacyWav, data)
-                return legacyWav
-            } catch (e: Throwable) {
-                android.util.Log.w("FFTT04M", "Legacy WAV encoding failed (${e.message}); attempting FLAC fallback")
-                try { if (legacyWav.exists()) legacyWav.delete() } catch (_: Throwable) {}
-            }
-            // Try FLAC even on legacy, in case it's available
-            val legacyFlac = File(dir, "$timestamp.flac")
-            return try {
-                encodeFlac(legacyFlac, data)
-                legacyFlac
-            } catch (e: Throwable) {
-                android.util.Log.e("FFTT04M", "Legacy FLAC fallback also failed: ${e.message}")
-                try { if (legacyFlac.exists()) legacyFlac.delete() } catch (_: Throwable) {}
-                null
-            }
-        }
-
-        val flacFile = File(dir, "$timestamp.flac")
-        try {
-            encodeFlac(flacFile, data)
-            return flacFile
-        } catch (e: Throwable) {
-            android.util.Log.w("FFTT04M", "FLAC encoding unavailable/failed (${e.message}); falling back to WAV")
-            try { if (flacFile.exists()) flacFile.delete() } catch (_: Throwable) {}
-        }
         val wavFile = File(dir, "$timestamp.wav")
         return try {
             encodeWav(wavFile, data)
             wavFile
         } catch (e: Throwable) {
-            android.util.Log.e("FFTT04M", "WAV fallback also failed: ${e.message}")
+            android.util.Log.e("FFTT04M", "WAV encoding failed: ${e.message}")
             try { if (wavFile.exists()) wavFile.delete() } catch (_: Throwable) {}
             null
         }
