@@ -277,6 +277,20 @@ class MainActivity : AppCompatActivity() {
      * Returns the file actually written, or null if both paths failed.
      */
     private fun saveFragmentAudio(dir: File?, timestamp: String, data: FloatArray): File? {
+        // Legacy devices (API < 26): skip FLAC entirely and write WAV directly.
+        // Older audio stacks produce unreliable/invalid container output via MediaCodec FLAC,
+        // so we go straight to the proven 16-bit PCM WAV writer instead of waiting for failure.
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.O) {
+            val legacyWav = File(dir, "$timestamp.wav")
+            return try {
+                encodeWav(legacyWav, data)
+                legacyWav
+            } catch (e: Throwable) {
+                android.util.Log.e("FFTT04M", "Legacy WAV encoding failed: ${e.message}")
+                null
+            }
+        }
+
         val flacFile = File(dir, "$timestamp.flac")
         try {
             encodeFlac(flacFile, data)
