@@ -213,12 +213,18 @@ class ViewerActivity : AppCompatActivity() {
 
         findViewById<Button?>(R.id.btnViewerNote)?.setOnClickListener { showCommentDialog() }
 
-        // btnViewerWavelet is optional in landscape (View placeholder used)
-        findViewById<View?>(R.id.btnViewerWavelet)?.setOnClickListener {
-            val intent = Intent(this, WaveletActivity::class.java).apply {
-                putExtra("FILE_PATH", filePath)
+        // btnViewerWavelet is optional in landscape (View placeholder used).
+        // Wavelet analysis is too heavy for older devices, so the entry point is hidden below API 26.
+        val waveletBtn = findViewById<View?>(R.id.btnViewerWavelet)
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.O) {
+            waveletBtn?.visibility = View.GONE
+        } else {
+            waveletBtn?.setOnClickListener {
+                val intent = Intent(this, WaveletActivity::class.java).apply {
+                    putExtra("FILE_PATH", filePath)
+                }
+                startActivity(intent)
             }
-            startActivity(intent)
         }
 
         setupFftSpinners()
