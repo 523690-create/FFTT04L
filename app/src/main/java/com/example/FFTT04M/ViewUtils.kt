@@ -14,22 +14,35 @@ import com.google.android.material.slider.Slider
  *
  * The slider *value* labels (the small TextViews that share a FrameLayout with a Slider) are skipped:
  * they're positioned and sized at runtime by the activities' label code, which would fight autosizing.
+ * EQ/Filter band labels are also skipped; they're handled by updateAllLabelPositions().
  */
 fun applyAutoSizeText(root: View, minSp: Int = 6, maxSp: Int = 18) {
     // TabLayout manages its own tab-label sizing; autosizing its internal TextViews fights it.
     if (root is com.google.android.material.tabs.TabLayout) return
+
+    // IDs of labels that are handled separately by updateAllLabelPositions() in ViewerActivity
+    val skipIds = intArrayOf(
+        R.id.lblEq100, R.id.lblEq300, R.id.lblEq1k, R.id.lblEq3k, R.id.lblEq8k,
+        R.id.lblFilterPercent, R.id.lblFilterRise, R.id.lblFilterFall
+    )
+
     if (root is ViewGroup) {
         val hasSlider = (0 until root.childCount).any { root.getChildAt(it) is Slider }
         for (i in 0 until root.childCount) {
             val child = root.getChildAt(i)
             // Inside a slider's FrameLayout, leave the positioned value label alone.
             if (hasSlider && child is TextView && child !is Button) continue
+            // Skip EQ/Filter band labels that are manually sized elsewhere
+            if (child is TextView && child.id in skipIds) continue
             applyAutoSizeText(child, minSp, maxSp)
         }
     } else if (root is TextView) { // Button is a TextView too
-        TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(
-            root, minSp, maxSp, 1, TypedValue.COMPLEX_UNIT_SP
-        )
+        // Skip the specific label IDs
+        if (root.id !in skipIds) {
+            TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(
+                root, minSp, maxSp, 1, TypedValue.COMPLEX_UNIT_SP
+            )
+        }
     }
 }
 
