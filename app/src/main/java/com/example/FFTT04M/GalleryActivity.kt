@@ -60,7 +60,9 @@ class GalleryActivity : AppCompatActivity() {
 
     private fun loadFiles() {
         val filesDir = getExternalFilesDir(null)
-        files = filesDir?.listFiles { file -> file.extension == "flac" }
+        // Match audio recordings: WAV is the current format; FLAC is kept for backward compat
+        // with files saved by older builds.
+        files = filesDir?.listFiles { file -> file.extension == "wav" || file.extension == "flac" }
             ?.sortedByDescending { it.lastModified() }
             ?.toMutableList() ?: mutableListOf()
         recyclerView.adapter = GalleryAdapter(files)

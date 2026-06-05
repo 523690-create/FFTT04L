@@ -695,7 +695,22 @@ class WaveletActivity : AppCompatActivity() {
         Thread {
             var codec: MediaCodec? = null
             var extractor: MediaExtractor? = null
+            val maxSamples = 200000
             try {
+                // WAV is raw PCM — no MediaCodec decoder for audio/raw, so parse directly.
+                if (file.extension.equals("wav", ignoreCase = true)) {
+                    val wav = WavReader.read(file, maxSamples)
+                    originalSampleRate = wav.sampleRate.toFloat()
+                    if (requestId == currentRequestId && !isStopRequested) {
+                        pcmData = wav.samples
+                        runOnUiThread {
+                            if (validateConstraints()) {
+                                runDwt()
+                            }
+                        }
+                    }
+                    return@Thread
+                }
                 extractor = MediaExtractor()
                 extractor.setDataSource(file.absolutePath)
                 if (extractor.trackCount == 0) {
@@ -720,8 +735,6 @@ class WaveletActivity : AppCompatActivity() {
                 var pcmCount = 0
                 val info = MediaCodec.BufferInfo()
                 var isEOS = false
-
-                val maxSamples = 200000 
 
                 while (!isEOS && pcmCount < maxSamples && !isStopRequested && requestId == currentRequestId) {
                     val inIdx = codec.dequeueInputBuffer(10000)

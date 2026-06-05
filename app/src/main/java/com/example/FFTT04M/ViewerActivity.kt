@@ -163,10 +163,11 @@ class ViewerActivity : AppCompatActivity() {
             }
         }
 
-        // Apply robust auto-sizing to ALL relevant labels to fix "printed too small" issues.
+        // Auto-size the slider VALUE labels and top-bar buttons. The EQ/Filter frequency HEADER
+        // labels (lblEq*, lblFilter*) are deliberately excluded: fitting them against the narrow
+        // column width picks a wrong size from stale dims and blows the text up to a clipped glyph
+        // ("100Hz" -> "Hz"). They keep their fixed XML textSize instead.
         val labelsToFit = intArrayOf(
-            R.id.lblEq100, R.id.lblEq300, R.id.lblEq1k, R.id.lblEq3k, R.id.lblEq8k,
-            R.id.lblFilterPercent, R.id.lblFilterRise, R.id.lblFilterFall,
             R.id.txtEq100Value, R.id.txtEq300Value, R.id.txtEq1kValue, R.id.txtEq3kValue, R.id.txtEq8kValue,
             R.id.vTxtFilterValue, R.id.vTxtRiseValue, R.id.vTxtFallValue,
             R.id.btnViewerGalleryTop, R.id.btnViewerListenTop, R.id.btnViewerWavelet, R.id.btnViewerNote, R.id.btnViewerPlay
@@ -813,54 +814,13 @@ class ViewerActivity : AppCompatActivity() {
         thread {
             beginBusy()
             try {
-                val extractor = MediaExtractor()
-                extractor.setDataSource(file.absolutePath)
-                extractor.selectTrack(0)
-                val format = extractor.getTrackFormat(0)
-                sampleRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE)
-                
-                // Update filters with correct sample rate
-                for (f in filters) {
-                    f.sampleRate = sampleRate.toFloat()
-                    f.updateCoefficients()
+                // WAV is raw PCM — MediaExtractor/MediaCodec has no decoder for audio/raw, so parse
+                // the header directly. FLAC (legacy files) still goes through MediaCodec.
+                if (file.extension.equals("wav", ignoreCase = true)) {
+                    decodeWav(file)
+                } else {
+                    decodeViaMediaCodec(file)
                 }
-
-                val codec = MediaCodec.createDecoderByType(format.getString(MediaFormat.KEY_MIME)!!)
-                codec.configure(format, null, null, 0)
-                codec.start()
-
-                val info = MediaCodec.BufferInfo()
-                var isEOS = false
-                val pcmList = mutableListOf<Float>()
-
-                while (!isEOS) {
-                    val inIndex = codec.dequeueInputBuffer(10000)
-                    if (inIndex >= 0) {
-                        val buffer = codec.getInputBuffer(inIndex)!!
-                        val sampleSize = extractor.readSampleData(buffer, 0)
-                        if (sampleSize < 0) {
-                            codec.queueInputBuffer(inIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
-                            isEOS = true
-                        } else {
-                            codec.queueInputBuffer(inIndex, 0, sampleSize, extractor.sampleTime, 0)
-                            extractor.advance()
-                        }
-                    }
-
-                    val outIndex = codec.dequeueOutputBuffer(info, 10000)
-                    if (outIndex >= 0) {
-                        val outBuffer = codec.getOutputBuffer(outIndex)!!
-                        while (outBuffer.remaining() >= 2) {
-                            pcmList.add(outBuffer.short / 32768f)
-                        }
-                        codec.releaseOutputBuffer(outIndex, false)
-                    }
-                }
-                codec.stop()
-                codec.release()
-                extractor.release()
-                
-                rawPcmData = pcmList.toFloatArray()
                 runOnUiThread { triggerRefresh() }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -868,6 +828,68 @@ class ViewerActivity : AppCompatActivity() {
                 endBusy()
             }
         }
+    }
+
+    /** Parse a raw PCM WAV (as written by MainActivity.encodeWav) into rawPcmData. */
+    private fun decodeWav(file: File) {
+        val wav = WavReader.read(file)
+        sampleRate = wav.sampleRate
+        for (f in filters) {
+            f.sampleRate = sampleRate.toFloat()
+            f.updateCoefficients()
+        }
+        rawPcmData = wav.samples
+    }
+
+    /** Decode compressed audio (e.g. legacy FLAC) via MediaExtractor + MediaCodec. */
+    private fun decodeViaMediaCodec(file: File) {
+        val extractor = MediaExtractor()
+        extractor.setDataSource(file.absolutePath)
+        extractor.selectTrack(0)
+        val format = extractor.getTrackFormat(0)
+        sampleRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE)
+
+        for (f in filters) {
+            f.sampleRate = sampleRate.toFloat()
+            f.updateCoefficients()
+        }
+
+        val codec = MediaCodec.createDecoderByType(format.getString(MediaFormat.KEY_MIME)!!)
+        codec.configure(format, null, null, 0)
+        codec.start()
+
+        val info = MediaCodec.BufferInfo()
+        var isEOS = false
+        val pcmList = mutableListOf<Float>()
+
+        while (!isEOS) {
+            val inIndex = codec.dequeueInputBuffer(10000)
+            if (inIndex >= 0) {
+                val buffer = codec.getInputBuffer(inIndex)!!
+                val sampleSize = extractor.readSampleData(buffer, 0)
+                if (sampleSize < 0) {
+                    codec.queueInputBuffer(inIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+                    isEOS = true
+                } else {
+                    codec.queueInputBuffer(inIndex, 0, sampleSize, extractor.sampleTime, 0)
+                    extractor.advance()
+                }
+            }
+
+            val outIndex = codec.dequeueOutputBuffer(info, 10000)
+            if (outIndex >= 0) {
+                val outBuffer = codec.getOutputBuffer(outIndex)!!
+                while (outBuffer.remaining() >= 2) {
+                    pcmList.add(outBuffer.short / 32768f)
+                }
+                codec.releaseOutputBuffer(outIndex, false)
+            }
+        }
+        codec.stop()
+        codec.release()
+        extractor.release()
+
+        rawPcmData = pcmList.toFloatArray()
     }
 
     private fun refreshFftInternal(refreshId: Int) {
