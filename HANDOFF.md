@@ -188,3 +188,42 @@ PLAY audio via AudioTrack
 ### Next (optional)
 - Landscape EQ/FILTER pages restructure for consistency
 - Top-bar button truncation tuning
+- Pixel 3 label readability: Listen tab and FFT landscape have unreadable labels
+- Wavelet UI quick fixes needed
+- Review slider value font logic for edge cases
+- Review button/control font logic, especially text overflows
+
+### API Downgrade Analysis (API 23 → 15)
+**Current min: API 23 (Nexus 7)**
+
+- API 22–16: AudioRecord, Material Slider, all key components work fine. No loss.
+- API 15: Material Slider (requires 14+) still works. **TextViewCompat.setAutoSizeText()** requires API 26+ fallback (code has guards for < 26).
+- **Bottom line**: Can drop to API 15 with no functional loss if Material library supports it. Core audio recording works on API 16+.
+
+### Devices & Known Issues
+- **Nexus 7 (API 23)**: ✅ Working end-to-end (record → save → gallery → viewer)
+- **Pixel 10 (API 36)**: ✅ Working
+- **Pixel 3 (API 29)**: ⚠️ **Label readability issues** (not currently attached; verify next session):
+  - Listen tab: labels unreadable
+  - FFT analysis landscape: all labels unreadable
+  - Likely: parent dimensions wrong, or font sizing algorithm under-estimating needed size
+  - Investigation needed: take landscape screenshot, compare with Nexus 7/Pixel 10
+
+### UI Fixes Pending
+1. **Wavelet UI**: Quick fixes needed (details TBD; check current state on Nexus 7)
+2. **Slider value font logic**: Review edge cases (where values overflow or squeeze)
+3. **Button/control font logic**: Review with attention to text overflows ("GA...", "LIS..." truncations)
+
+### For Future Sessions (Different Computer, Same Account)
+- Same git workflow: clone from origin/main, branch, commit, PR
+- Build environment: Android Studio Quail 1, targetSdk 36, gradlew available
+- Test devices: Nexus 7 (API 23, 7" tablet), Pixel 10 (API 36, modern phone), Pixel 3 (API 29, phone) — all attached via adb
+- Critical install gotcha: ALWAYS `adb uninstall com.example.FFTT04M` BEFORE installing new APK (signing key mismatch from Studio update)
+- Audio: uses raw PCM only (FloatArray), 44.1kHz, mono. WAV format (16-bit PCM header + samples) is the only save format now
+- Key files to understand:
+  - MainActivity.kt: live recording + crop → save
+  - ViewerActivity.kt: load .wav/.flac → decode → display spectrogram + EQ/Filter/Display tabs
+  - WaveletActivity.kt: load .wav/.flac → wavelet analysis
+  - WavReader.kt: parses raw PCM WAV (no MediaCodec, no container specs)
+  - ViewUtils.kt: applyAutoSizeText() walks layout tree, skips EQ/Filter headers; updateAllLabelPositions() dynamically sizes all labels
+- Current state: portrait EQ/Filter working well (headers above sliders with dynamic sizing); landscape still side-by-side (readable but compact); Pixel 3 has label readability issues
