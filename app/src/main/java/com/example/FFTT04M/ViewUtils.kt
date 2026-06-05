@@ -108,13 +108,14 @@ fun TextView.setMaxTextSizeToFit(
                     )
 
                     var maxWidth = 0f
-                    val bounds = android.graphics.Rect()
                     val fm = paint.fontMetrics
                     val lineHeight = fm.bottom - fm.top
 
                     for (line in lines) {
-                        paint.getTextBounds(line, 0, line.length, bounds)
-                        maxWidth = kotlin.math.max(maxWidth, bounds.width().toFloat())
+                        // measureText (not getTextBounds) so letterSpacing — applied by Material
+                        // buttons — is counted; otherwise width is underestimated and the text
+                        // overflows into an ellipsis.
+                        maxWidth = kotlin.math.max(maxWidth, paint.measureText(line))
                     }
                     val totalHeight = lines.size * lineHeight
 
