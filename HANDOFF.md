@@ -4,12 +4,32 @@ Read this file first, then continue the work. This captures context that is NOT 
 codebase or the other .md files — it lives only in the chat session that produced it.
 Date: 2026-06-05.
 
-## COMPLETED IN THIS SESSION (2026-06-05)
-- ✅ **Nexus 7 save regression fixed** (commit `28dd073`): Added WAV fallback to legacy API path so API < 26 devices get files
-- ✅ **Band-label corruption fixed** (commit `301082a`): EQ/Filter headers skipped in autosize, handled by updateAllLabelPositions()
-- ✅ **FLAC removed, WAV-only** (commit `a31505e`): Switched to reliable 16-bit PCM WAV exclusively; removed invalid FLAC container format
-- ✅ **UI_CHANGELIST.md**: Already fully reconciled with all items marked ✅
-Next: landscape/portrait label polish as desired, or consider complete.
+## COMPLETED IN THIS SESSION (2026-06-05) — verified on Nexus 7 (API 23) landscape
+- ✅ **FLAC removed, WAV-only** (`a31505e`): 16-bit PCM WAV everywhere; dropped the invalid FLAC container.
+- ✅ **REAL root cause of "empty Gallery" found & fixed** (`4fab9d7`): GalleryActivity only
+  listed `.flac`, so WAV recordings never showed. The "save regression" was a red herring —
+  saves were succeeding, just invisible. Fixes:
+  - GalleryActivity now lists `.wav` (+ `.flac` legacy).
+  - New `WavReader.kt` parses raw PCM WAV (no MediaCodec decoder exists for audio/raw).
+  - ViewerActivity.loadAndDecode + WaveletActivity.loadAndDecode branch on extension:
+    WAV → WavReader, FLAC → MediaExtractor/MediaCodec. PLAY uses decoded PCM, unchanged.
+- ✅ **Band-label corruption ACTUALLY fixed** (`4fab9d7`): real culprit was
+  `updateAllLabelPositions()` calling `setMaxTextSizeToFit()` on the header labels (blew them
+  up from stale parent dims → clipped to one glyph). Removed header labels from that fit list;
+  they keep fixed XML textSize. (Earlier `301082a` autosize-skip alone was NOT sufficient.)
+- ✅ **UI_CHANGELIST.md**: already fully reconciled.
+
+### Verified end-to-end on Nexus 7
+Gallery lists the WAV → tap opens Viewer → spectrogram renders → EQ ("100/300/1k/3k/8k Hz"),
+FILTER ("Filter %/Rise Time/Fall Time"), and DISPLAY labels all render correctly.
+
+### Superseded notes (kept for history)
+- `28dd073` (WAV fallback in legacy save path) and `301082a` (autosize skip) were partial; the
+  `a31505e` + `4fab9d7` changes are the complete fix. The legacy save fallback in `28dd073` was
+  later replaced by WAV-only in `a31505e`.
+
+Next (optional polish): push a matching `.png` so gallery thumbnails aren't placeholders for
+adb-pushed test files (real recordings already write the PNG); minor top-bar truncation tuning.
 
 ## How to work on this project (conventions)
 See `agents.md` for full rules. Key points: don't apologize; terse technical tone; apply
