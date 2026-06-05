@@ -63,11 +63,19 @@ fun TextView.setMaxTextSizeToFit(
     maxSizeSp: Float = 100f
 ) {
     val parent = this.parent as? View ?: return
-    
+
     val runFit = {
-        val w = parent.width
-        val h = parent.height
-        
+        // Size against the view's OWN allocated box when its dimensions are determinate
+        // (match_parent or 0dp+weight). Only fall back to the parent for wrap_content
+        // dimensions, whose own measured size just echoes the text and can't bound it.
+        // This keeps a label/button from ballooning to fill a much larger parent (the cause
+        // of clipped EQ labels in narrow landscape columns and truncated top-bar buttons).
+        val wrap = ViewGroup.LayoutParams.WRAP_CONTENT
+        val lpW = this.layoutParams?.width ?: wrap
+        val lpH = this.layoutParams?.height ?: wrap
+        val w = if (lpW != wrap && this.width > 0) this.width else parent.width
+        val h = if (lpH != wrap && this.height > 0) this.height else parent.height
+
         if (w > 0 && h > 0) {
             val cacheKey = "fit_$text"
             val cacheVal = "${w}_${h}"
@@ -75,8 +83,13 @@ fun TextView.setMaxTextSizeToFit(
                 // Disable standard autosizing which might fight us
                 TextViewCompat.setAutoSizeTextTypeWithDefaults(this, TextViewCompat.AUTO_SIZE_TEXT_TYPE_NONE)
 
-                val targetWidth = w * maxWidthRatio
-                val targetHeight = h * maxHeightRatio
+                // Subtract the content padding so text fits the drawable area, not the raw
+                // view box. Without this, buttons size text to their full width and the
+                // internal padding pushes it into an ellipsis ("GALLERY" -> "GALLE...").
+                val padW = (compoundPaddingLeft + compoundPaddingRight).coerceAtLeast(0)
+                val padH = (compoundPaddingTop + compoundPaddingBottom).coerceAtLeast(0)
+                val targetWidth = (w - padW).coerceAtLeast(1) * maxWidthRatio
+                val targetHeight = (h - padH).coerceAtLeast(1) * maxHeightRatio
 
                 val paint = android.graphics.Paint(this.paint)
                 var low = minSizeSp
