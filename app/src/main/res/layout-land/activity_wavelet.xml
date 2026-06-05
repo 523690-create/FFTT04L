@@ -162,6 +162,6 @@
     </LinearLayout>
 
     <!-- Stub: btnWaveletStop removed from portrait UI but referenced in code -->
-    <View android:id="@+id/btnWaveletStop" android:layout_width="0dp" android:layout_height="0dp" />
+    <Button android:id="@+id/btnWaveletStop" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
