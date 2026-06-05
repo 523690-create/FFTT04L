@@ -605,9 +605,10 @@ class MainActivity : AppCompatActivity() {
                 it.setTextColor(Color.BLACK)
                 it.elevation = 6f * density
                 it.minWidth = (40f * density).toInt()
-                it.textSize = 8f
                 it.gravity = android.view.Gravity.CENTER
                 it.setPadding(0, (2f * density).toInt(), 0, 0)
+                // Dynamically size the value text to fit the column (replaces the old fixed 8sp).
+                it.setMaxTextSizeToFit(it.text.toString(), maxSizeSp = 14f)
             }
 
             updateLabelPosition(slider, label)

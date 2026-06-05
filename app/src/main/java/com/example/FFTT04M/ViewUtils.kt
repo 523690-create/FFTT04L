@@ -84,6 +84,9 @@ fun TextView.setMaxTextSizeToFit(
                 var best = low
 
                 val lines = text.split("\n")
+                // Pin the line count so the text can never spill onto an extra line and wrap
+                // per-character (e.g. "Hz" breaking into "H"/"z" in a narrow column).
+                this.maxLines = lines.size
 
                 while (low <= high) {
                     val mid = (low + high) / 2f
