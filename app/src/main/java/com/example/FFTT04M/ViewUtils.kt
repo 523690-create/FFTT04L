@@ -136,7 +136,16 @@ fun TextView.setMaxTextSizeToFit(
     }
 
     if (parent.width <= 0 || parent.height <= 0) {
-        parent.post { runFit() }
+        // Prevent multiple pending posts for the same view (guard against layout thrashing freezes
+        // when tabs change and parent dimensions aren't ready yet). Only post if one isn't pending.
+        val pendingKey = "fit_pending_${this.id}"
+        if (this.getTag(R.id.tag_fit_pending) != true) {
+            this.setTag(R.id.tag_fit_pending, true)
+            parent.post {
+                this.setTag(R.id.tag_fit_pending, null)
+                runFit()
+            }
+        }
     } else {
         runFit()
     }
