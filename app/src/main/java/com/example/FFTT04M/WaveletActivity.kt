@@ -271,14 +271,17 @@ class WaveletActivity : AppCompatActivity() {
         
         val thumbY = trackBottom - (normalizedValue * trackLength)
         
-        // Bar extends from thumbY down to container bottom
-        val barTopY = thumbY
+        // Bar extends from thumbY down to container bottom. Clamp the bar top up by the label's
+        // 24dp minimum height so the value label can't extend past the container bottom and clip —
+        // this is what cut off the value number when the slider sat at its minimum.
+        val minLabelHeight = 24f * density
+        val barTopY = thumbY.coerceAtMost(totalHeight - minLabelHeight).coerceAtLeast(0f)
         
         // Align label top with barTopY
         label.translationY = barTopY - label.top
         
         // Set label height to fill the remaining space
-        val targetHeight = (totalHeight - barTopY).toInt().coerceAtLeast((24f * density).toInt())
+        val targetHeight = (totalHeight - barTopY).toInt().coerceAtLeast(minLabelHeight.toInt())
         if (label.layoutParams.height != targetHeight) {
             label.layoutParams.height = targetHeight
             label.requestLayout()
@@ -373,7 +376,7 @@ class WaveletActivity : AppCompatActivity() {
             "${modeNames[analysisMode]} · safe FS ≤ ${String.format(java.util.Locale.US, "%.1f", ceilingKhz)} kHz"
         }
         txtSafetyStatus.setTextColor(if (over) Color.YELLOW else Color.LTGRAY)
-        txtSafetyStatus.setMaxTextSizeToFit(statusText)
+        txtSafetyStatus.setMaxTextSizeToFit(statusText, maxSizeSp = 12f)
     }
 
     /**

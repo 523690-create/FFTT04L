@@ -5,4 +5,5 @@
     <item name="sliderColor" type="id" />
     <item name="tag_fit_text" type="id" />
     <item name="tag_fit_dims" type="id" />
+    <item name="tag_fit_pending" type="id" />
 </resources>
