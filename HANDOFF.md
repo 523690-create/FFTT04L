@@ -4,6 +4,13 @@ Read this file first, then continue the work. This captures context that is NOT 
 codebase or the other .md files — it lives only in the chat session that produced it.
 Date: 2026-06-05.
 
+## COMPLETED IN THIS SESSION (2026-06-05)
+- ✅ **Nexus 7 save regression fixed** (commit `28dd073`): Added WAV fallback to legacy API path so API < 26 devices get files
+- ✅ **Band-label corruption fixed** (commit `301082a`): EQ/Filter headers skipped in autosize, handled by updateAllLabelPositions()
+- ✅ **FLAC removed, WAV-only** (commit `a31505e`): Switched to reliable 16-bit PCM WAV exclusively; removed invalid FLAC container format
+- ✅ **UI_CHANGELIST.md**: Already fully reconciled with all items marked ✅
+Next: landscape/portrait label polish as desired, or consider complete.
+
 ## How to work on this project (conventions)
 See `agents.md` for full rules. Key points: don't apologize; terse technical tone; apply
 only the most-recently-requested change; after each change do a Gradle sync + build and do
