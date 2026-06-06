@@ -62,45 +62,38 @@
             android:layout_weight="1"
             android:orientation="vertical">
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="bottom"
-                android:weightSum="3">
-                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center_horizontal">
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="FAM" android:textColor="#FFFF00" android:textSize="10sp" android:textStyle="bold"/>
-                    <Spinner android:id="@+id/waveletFamilySpinner" android:layout_width="match_parent" android:layout_height="wrap_content" android:backgroundTint="#FFFFFF" android:layout_margin="2dp" />
-                </LinearLayout>
-                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center_horizontal">
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="BND" android:textColor="#FFFF00" android:textSize="10sp" android:textStyle="bold"/>
-                    <Spinner android:id="@+id/waveletBoundarySpinner" android:layout_width="match_parent" android:layout_height="wrap_content" android:backgroundTint="#FFFFFF" android:layout_margin="2dp" />
-                </LinearLayout>
-                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center_horizontal">
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="MODE" android:textColor="#FFFF00" android:textSize="10sp" android:textStyle="bold"/>
-                    <Spinner android:id="@+id/waveletModeSpinner" android:layout_width="match_parent" android:layout_height="wrap_content" android:backgroundTint="#FFFFFF" android:layout_margin="2dp" />
-                </LinearLayout>
+            <!-- Each spinner on its own full-width row so the long descriptions fit (mirrors portrait) -->
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginBottom="2dp">
+                <TextView android:layout_width="64dp" android:layout_height="wrap_content" android:text="FAM" android:textColor="#FFFF00" android:textSize="12sp" android:textStyle="bold"/>
+                <Spinner android:id="@+id/waveletFamilySpinner" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:backgroundTint="#FFFFFF" android:layout_marginStart="4dp" />
+            </LinearLayout>
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginBottom="2dp">
+                <TextView android:layout_width="64dp" android:layout_height="wrap_content" android:text="BND" android:textColor="#FFFF00" android:textSize="12sp" android:textStyle="bold"/>
+                <Spinner android:id="@+id/waveletBoundarySpinner" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:backgroundTint="#FFFFFF" android:layout_marginStart="4dp" />
+            </LinearLayout>
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginBottom="2dp">
+                <TextView android:layout_width="64dp" android:layout_height="wrap_content" android:text="MODE" android:textColor="#FFFF00" android:textSize="12sp" android:textStyle="bold"/>
+                <Spinner android:id="@+id/waveletModeSpinner" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:backgroundTint="#FFFFFF" android:layout_marginStart="4dp" />
             </LinearLayout>
 
+            <!-- Legacy status (GONE): shown inline next to SOFT instead -->
             <TextView
                 android:id="@+id/txtSafetyStatus"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textColor="#AAAAAA"
-                android:textSize="9sp"
-                android:gravity="center"
-                android:paddingVertical="2dp"
-                android:singleLine="true"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:visibility="gone"
                 android:text="" />
 
+            <!-- Threshold row; safety indicator sits to the right of SOFT -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
                 android:layout_marginTop="4dp">
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="THRESH:" android:textColor="#AAAAAA" android:textSize="10sp" android:textStyle="bold" android:layout_marginEnd="6dp"/>
-                <CheckBox android:id="@+id/checkSoftThresh" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="SOFT" android:textColor="#FFFFFF" android:buttonTint="#FFFFFF" android:textSize="10sp" android:layout_marginEnd="10dp" />
+                <TextView android:layout_width="64dp" android:layout_height="wrap_content" android:text="Threshold" android:textColor="#AAAAAA" android:textSize="11sp" android:textStyle="bold" android:maxLines="1"/>
+                <CheckBox android:id="@+id/checkSoftThresh" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="SOFT" android:textColor="#FFFFFF" android:buttonTint="#FFFFFF" android:textSize="11sp" android:maxLines="1" android:layout_marginStart="4dp" />
+                <TextView android:id="@+id/txtModeSafeIndicator" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="" android:textColor="#FFCC99" android:textSize="10sp" android:gravity="end" android:layout_marginStart="4dp" android:layout_marginEnd="2dp" android:maxLines="1" android:ellipsize="end" />
             </LinearLayout>
 
             <LinearLayout
@@ -109,9 +102,9 @@
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
                 android:layout_marginTop="2dp">
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="VIEW:" android:textColor="#AAAAAA" android:textSize="10sp" android:textStyle="bold" android:layout_marginEnd="6dp"/>
-                <CheckBox android:id="@+id/checkLogScale" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="LOG" android:textColor="#FFFFFF" android:buttonTint="#FFFFFF" android:textSize="10sp" android:layout_marginEnd="8dp" />
-                <CheckBox android:id="@+id/checkLocalNorm" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="L-NORM" android:textColor="#FFFFFF" android:buttonTint="#FFFFFF" android:textSize="10sp" />
+                <TextView android:layout_width="64dp" android:layout_height="wrap_content" android:text="View" android:textColor="#AAAAAA" android:textSize="11sp" android:textStyle="bold" android:maxLines="1"/>
+                <CheckBox android:id="@+id/checkLogScale" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="LOG" android:textColor="#FFFFFF" android:buttonTint="#FFFFFF" android:textSize="11sp" android:maxLines="1" android:layout_marginEnd="8dp" />
+                <CheckBox android:id="@+id/checkLocalNorm" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="L-NORM" android:textColor="#FFFFFF" android:buttonTint="#FFFFFF" android:textSize="11sp" android:maxLines="1" />
             </LinearLayout>
         </LinearLayout>
 
