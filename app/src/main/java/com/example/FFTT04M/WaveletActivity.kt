@@ -364,10 +364,17 @@ class WaveletActivity : AppCompatActivity() {
     private fun thresholdLabel(t: Float): String =
         if (t <= 0f) "OFF" else String.format(java.util.Locale.US, "%.3f", t)
 
-    /** Refresh the safety status line: current mode + the largest sampling freq that fits. */
+    /** Refresh the safety status line: current mode + the largest sampling freq that fits.
+     *  Portrait shows this compactly inline next to the SOFT checkbox (txtModeSafeIndicator);
+     *  the legacy full-width txtSafetyStatus is kept for layouts that still declare it. */
     private fun updateSafetyStatus() {
+        val inline = findViewById<TextView?>(R.id.txtModeSafeIndicator)
         val pcm = pcmData
-        if (pcm == null || pcm.isEmpty()) { txtSafetyStatus.text = ""; return }
+        if (pcm == null || pcm.isEmpty()) {
+            txtSafetyStatus.text = ""
+            inline?.text = ""
+            return
+        }
         val ceilingKhz = safeFreqCeiling() / 1000f
         val over = targetFreq > safeFreqCeiling()
         val statusText = if (over) {
@@ -377,6 +384,13 @@ class WaveletActivity : AppCompatActivity() {
         }
         txtSafetyStatus.setTextColor(if (over) Color.YELLOW else Color.LTGRAY)
         txtSafetyStatus.setMaxTextSizeToFit(statusText, maxSizeSp = 12f)
+
+        // Compact inline indicator, e.g. "CWT safe <60kHz" (or "⚠ CWT >60kHz" when over budget).
+        inline?.apply {
+            text = if (over) "⚠ ${modeNames[analysisMode]} >${String.format(java.util.Locale.US, "%.0f", ceilingKhz)}kHz"
+                    else "${modeNames[analysisMode]} safe <${String.format(java.util.Locale.US, "%.0f", ceilingKhz)}kHz"
+            setTextColor(if (over) Color.YELLOW else Color.parseColor("#FFCC99"))
+        }
     }
 
     /**

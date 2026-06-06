@@ -203,8 +203,10 @@ class ViewerActivity : AppCompatActivity() {
         }
     }
 
+    // Cap at 12sp so short labels ("COLOR", "Blur:0") don't balloon to fill their full-width row;
+    // keeps all Display-tab controls at a consistent size with the top-bar buttons.
     private fun fitSpinner(s: Spinner) {
-        (s.selectedView as? TextView)?.let { it.setMaxTextSizeToFit(it.text.toString()) }
+        (s.selectedView as? TextView)?.let { it.setMaxTextSizeToFit(it.text.toString(), maxSizeSp = 12f) }
     }
 
     private fun setupControls() {
@@ -319,7 +321,7 @@ class ViewerActivity : AppCompatActivity() {
             (colorSpinner.selectedView as? android.widget.TextView)?.apply {
                 setTextColor(fg)
                 setBackgroundColor(bg)
-                setMaxTextSizeToFit("COLOR")
+                setMaxTextSizeToFit("COLOR", maxSizeSp = 12f)
             }
         }
     }

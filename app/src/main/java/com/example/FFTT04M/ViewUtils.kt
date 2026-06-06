@@ -23,7 +23,10 @@ fun applyAutoSizeText(root: View, minSp: Int = 6, maxSp: Int = 18) {
     // IDs of labels that are handled separately by updateAllLabelPositions() in ViewerActivity
     val skipIds = intArrayOf(
         R.id.lblEq100, R.id.lblEq300, R.id.lblEq1k, R.id.lblEq3k, R.id.lblEq8k,
-        R.id.lblFilterPercent, R.id.lblFilterRise, R.id.lblFilterFall
+        R.id.lblFilterPercent, R.id.lblFilterRise, R.id.lblFilterFall,
+        // Display-tab ENHANCE button: keep its fixed size so it matches the adjacent spinners
+        // instead of auto-growing to fill its full-width row.
+        R.id.btnViewerSweep
     )
 
     if (root is ViewGroup) {
