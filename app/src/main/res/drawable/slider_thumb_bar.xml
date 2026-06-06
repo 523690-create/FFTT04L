@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Subtle slider thumb: a thin solid bar spanning the track width. Solid (not gradient) so it can
+     be tinted per-slider to a colour slightly lighter than that slider's bar. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#FFFFFF" />
+    <size android:height="5dp" android:width="200dp" />
+</shape>

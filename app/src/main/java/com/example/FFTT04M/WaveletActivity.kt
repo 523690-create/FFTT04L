@@ -220,20 +220,34 @@ class WaveletActivity : AppCompatActivity() {
                 val p = (2f * density).toInt()
                 it.setPadding(p, 0, p, 0)
                 it.elevation = 6f * density
-                it.minWidth = (50f * density).toInt()
-                it.textSize = 8f
+                it.minWidth = (64f * density).toInt()   // wider value bar
+                it.textSize = 12f                         // larger value text inside the bar
             }
+
+            // Subtle thumb: a thin bar tinted slightly lighter than this slider's own bar colour.
+            val barColor = slider.trackActiveTintList?.defaultColor ?: Color.WHITE
+            val thumbDrawable = androidx.core.content.ContextCompat
+                .getDrawable(this, R.drawable.slider_thumb_bar)?.mutate()
+            thumbDrawable?.setTint(lightenColor(barColor, 0.22f))
 
             slider.post {
                 val labelWidth = label?.width ?: 0
                 if (labelWidth > 0) {
                     slider.trackHeight = labelWidth
                     slider.thumbRadius = (2f * density).toInt()
-                    slider.setCustomThumbDrawable(R.drawable.slider_thumb_line)
+                    if (thumbDrawable != null) slider.setCustomThumbDrawable(thumbDrawable)
                     updateLabelPosition(slider, label)
                 }
             }
         }
+    }
+
+    /** Blend [color] toward white by [fraction] (0 = unchanged, 1 = white). */
+    private fun lightenColor(color: Int, fraction: Float): Int {
+        val r = (Color.red(color) + (255 - Color.red(color)) * fraction).toInt().coerceIn(0, 255)
+        val g = (Color.green(color) + (255 - Color.green(color)) * fraction).toInt().coerceIn(0, 255)
+        val b = (Color.blue(color) + (255 - Color.blue(color)) * fraction).toInt().coerceIn(0, 255)
+        return Color.rgb(r, g, b)
     }
 
     private fun updateLabelPosition(slider: Slider, label: TextView?) {
@@ -669,16 +683,18 @@ class WaveletActivity : AppCompatActivity() {
         }
     }
 
-    /** Same COLOR-control appearance as Listen/FFT: caption "COLOR", text=high color, bg=low color. */
+    /** Match the Listen/FFT COLOR control exactly: caption "COLOR", bg = high color, text = low color
+     *  (was reversed here), and fit the caption like the other top-bar controls. */
     private fun styleColorSpinner(schemeIdx: Int) {
         colorSpinner.post {
-            val bg = waveletView.lowColorFor(schemeIdx)
-            val fg = waveletView.highColorFor(schemeIdx)
+            val bg = waveletView.highColorFor(schemeIdx)
+            val fg = waveletView.lowColorFor(schemeIdx)
             colorSpinner.setBackgroundColor(bg)
             (colorSpinner.selectedView as? TextView)?.apply {
                 setTextColor(fg)
                 setBackgroundColor(bg)
                 text = "COLOR"
+                setMaxTextSizeToFit("COLOR", maxSizeSp = 12f)
             }
         }
     }
