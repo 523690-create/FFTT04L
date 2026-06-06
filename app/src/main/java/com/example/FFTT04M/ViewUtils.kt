@@ -1,10 +1,15 @@
 package com.example.FFTT04M
 
+import android.content.res.ColorStateList
+import android.graphics.Color
 import android.util.TypedValue
+import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.TextView
+import androidx.core.content.ContextCompat
+import androidx.core.view.isGone
 import androidx.core.widget.TextViewCompat
 import com.google.android.material.slider.Slider
 
@@ -152,4 +157,133 @@ fun TextView.setMaxTextSizeToFit(
     } else {
         runFit()
     }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Unified value-bar slider rendering — shared by Listen / FFT-Viewer / Wavelet so every vertical
+// value slider looks identical. The Material Slider's own track is hidden; the value TextView becomes
+// a flat coloured bar that fills 8/9 of its column (8:1 bar:gutter), centred, capped by a subtle
+// thumb slightly lighter than the bar. Default ticks remain as a faint centred "dotted line".
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Blend [color] toward white by [fraction] (0 = unchanged, 1 = white). */
+fun lightenColor(color: Int, fraction: Float): Int {
+    val r = (Color.red(color) + (255 - Color.red(color)) * fraction).toInt().coerceIn(0, 255)
+    val g = (Color.green(color) + (255 - Color.green(color)) * fraction).toInt().coerceIn(0, 255)
+    val b = (Color.blue(color) + (255 - Color.blue(color)) * fraction).toInt().coerceIn(0, 255)
+    return Color.rgb(r, g, b)
+}
+
+/**
+ * Style [slider] + its value [label] as one unified value bar in [barColor]. [valueMaxSp] caps the
+ * auto-fitted value text. Call once per slider; it re-posts itself until the column has a width.
+ */
+fun styleValueBarSlider(slider: Slider, label: TextView?, barColor: Int, valueMaxSp: Float = 18f) {
+    slider.post {
+        val parent = slider.parent as? View ?: return@post
+        val column = parent.width
+        if (column <= 0) return@post
+        val density = slider.resources.displayMetrics.density
+        val barWidth = column * 8 / 9                       // 8:1 bar:gutter, centred in the column
+
+        // Hide the real track + halo; keep default ticks as a faint centred dotted guide.
+        slider.trackActiveTintList = ColorStateList.valueOf(Color.TRANSPARENT)
+        slider.trackInactiveTintList = ColorStateList.valueOf(Color.TRANSPARENT)
+        slider.haloTintList = ColorStateList.valueOf(Color.TRANSPARENT)
+        slider.trackHeight = barWidth
+
+        // Subtle thumb: a thin bar slightly lighter than this slider's own colour, capping the bar.
+        val thumb = ContextCompat.getDrawable(slider.context, R.drawable.slider_thumb_bar)?.mutate()
+        thumb?.setTint(lightenColor(barColor, 0.30f))
+        slider.thumbRadius = (2f * density).toInt()
+        if (thumb != null) slider.setCustomThumbDrawable(thumb)
+
+        label?.let { lab ->
+            lab.setTextColor(Color.BLACK)
+            lab.setBackgroundColor(barColor)
+            lab.elevation = 6f * density
+            lab.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+            lab.setPadding(0, (2f * density).toInt(), 0, 0)
+            val lp = lab.layoutParams
+            lp.width = barWidth
+            lab.layoutParams = lp
+            lab.minWidth = barWidth
+            lab.maxWidth = barWidth
+            lab.setTag(R.id.tag_value_max_sp, valueMaxSp)
+        }
+
+        slider.post { updateValueBarLabel(slider, label, barColor) }
+    }
+}
+
+/** Size [label]'s value text to fit the bar WIDTH only (height-independent, so it's stable as the
+ *  fill height changes and correct when the value text changes). Cached by text+width. */
+private fun fitBarValueText(label: TextView, barWidth: Int) {
+    if (barWidth <= 0) return
+    val text = label.text?.toString() ?: return
+    val cacheKey = "barfit_${text}_$barWidth"
+    if (label.getTag(R.id.tag_fit_text) == cacheKey) return
+    val maxSp = (label.getTag(R.id.tag_value_max_sp) as? Float) ?: 20f
+    val lines = text.split("\n")
+    label.maxLines = lines.size
+    val paint = android.graphics.Paint(label.paint)
+    val dm = label.resources.displayMetrics
+    var sp = maxSp
+    while (sp > 7f) {
+        paint.textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, sp, dm)
+        val widest = lines.maxOf { paint.measureText(it) }
+        if (widest <= barWidth * 0.90f) break
+        sp -= 0.5f
+    }
+    label.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp)
+    label.setTag(R.id.tag_fit_text, cacheKey)
+}
+
+/**
+ * Position the value [label] so its coloured fill runs from the thumb down to the container bottom.
+ * Defers via a single guarded post (never an OnGlobalLayoutListener — that cascades into a layout
+ * storm / ANR on tab switches when many labels are height-0 at once).
+ */
+fun updateValueBarLabel(slider: Slider, label: TextView?, barColor: Int) {
+    if (label == null) return
+    if (slider.isGone || label.isGone) return
+
+    if (slider.height == 0 || label.height == 0 || label.layout == null) {
+        if (label.getTag(R.id.tag_pos_pending) != true) {
+            label.setTag(R.id.tag_pos_pending, true)
+            label.post {
+                label.setTag(R.id.tag_pos_pending, null)
+                updateValueBarLabel(slider, label, barColor)
+            }
+        }
+        return
+    }
+
+    val range = slider.valueTo - slider.valueFrom
+    if (range <= 0f) return
+    val normalized = (slider.value - slider.valueFrom) / range
+    val totalHeight = slider.height.toFloat()
+    val density = slider.resources.displayMetrics.density
+
+    val thumbRadius = slider.thumbRadius.toFloat()
+    val trackTop = slider.paddingTop + thumbRadius
+    val trackBottom = totalHeight - slider.paddingBottom - thumbRadius
+    val trackLength = trackBottom - trackTop
+    val thumbY = trackBottom - (normalized * trackLength)
+
+    // Clamp so a value at the minimum still shows a bar tall enough for the (≤2-line) value text.
+    val minH = 46f * density
+    val barTopY = thumbY.coerceAtMost(totalHeight - minH).coerceAtLeast(0f)
+    label.translationY = barTopY - label.top
+
+    val targetHeight = (totalHeight - barTopY).toInt().coerceAtLeast(minH.toInt())
+    if (label.layoutParams.height != targetHeight) {
+        label.layoutParams.height = targetHeight
+        label.requestLayout()
+    }
+    label.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+    label.setBackgroundColor(barColor)
+    label.setTextColor(Color.BLACK)
+    label.elevation = 6f * density
+    fitBarValueText(label, label.layoutParams.width)
 }

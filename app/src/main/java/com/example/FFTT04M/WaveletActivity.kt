@@ -206,116 +206,19 @@ class WaveletActivity : AppCompatActivity() {
         updateSafetyStatus()
     }
 
-    private fun adjustSliderThickness(slider: Slider, label: TextView?) {
-        slider.post {
-            val parent = (slider.parent as? View) ?: return@post
-            val availableWidth = parent.width.toFloat()
-            if (availableWidth <= 0) return@post
-
-            val density = resources.displayMetrics.density
-            
-            label?.let {
-                it.setBackgroundColor(Color.WHITE)
-                it.setTextColor(Color.BLACK)
-                val p = (2f * density).toInt()
-                it.setPadding(p, 0, p, 0)
-                it.elevation = 6f * density
-                it.minWidth = (64f * density).toInt()   // wider value bar
-                it.textSize = 12f                         // larger value text inside the bar
-            }
-
-            // Subtle thumb: a thin bar tinted slightly lighter than this slider's own bar colour.
-            val barColor = slider.trackActiveTintList?.defaultColor ?: Color.WHITE
-            val thumbDrawable = androidx.core.content.ContextCompat
-                .getDrawable(this, R.drawable.slider_thumb_bar)?.mutate()
-            thumbDrawable?.setTint(lightenColor(barColor, 0.22f))
-
-            slider.post {
-                val labelWidth = label?.width ?: 0
-                if (labelWidth > 0) {
-                    slider.trackHeight = labelWidth
-                    slider.thumbRadius = (2f * density).toInt()
-                    if (thumbDrawable != null) slider.setCustomThumbDrawable(thumbDrawable)
-                    updateLabelPosition(slider, label)
-                }
-            }
-        }
+    private fun barColorForSlider(slider: Slider): Int = when (slider.id) {
+        R.id.sliderLevel, R.id.sliderOrder -> Color.GREEN
+        R.id.sliderThreshold -> Color.CYAN
+        else -> Color.LTGRAY // FS / sampling
     }
 
-    /** Blend [color] toward white by [fraction] (0 = unchanged, 1 = white). */
-    private fun lightenColor(color: Int, fraction: Float): Int {
-        val r = (Color.red(color) + (255 - Color.red(color)) * fraction).toInt().coerceIn(0, 255)
-        val g = (Color.green(color) + (255 - Color.green(color)) * fraction).toInt().coerceIn(0, 255)
-        val b = (Color.blue(color) + (255 - Color.blue(color)) * fraction).toInt().coerceIn(0, 255)
-        return Color.rgb(r, g, b)
-    }
+    // Slider rendering is unified in ViewUtils (styleValueBarSlider / updateValueBarLabel) so the
+    // Wavelet sliders look identical to the Listen/FFT EQ & Filter sliders.
+    private fun adjustSliderThickness(slider: Slider, label: TextView?) =
+        styleValueBarSlider(slider, label, barColorForSlider(slider))
 
-    private fun updateLabelPosition(slider: Slider, label: TextView?) {
-        if (label == null) return
-        
-        // If the view is effectively hidden (GONE), skip to avoid infinite layout loops.
-        if (slider.isGone || label.isGone) return
-
-        // Ensure dimensions and layout are ready
-        if (slider.height == 0 || label.height == 0 || label.layout == null) {
-            label.viewTreeObserver.addOnGlobalLayoutListener(object : ViewTreeObserver.OnGlobalLayoutListener {
-                override fun onGlobalLayout() {
-                    if (label.height > 0 && label.layout != null && slider.height > 0) {
-                        label.viewTreeObserver.removeOnGlobalLayoutListener(this)
-                        updateLabelPosition(slider, label)
-                    }
-                }
-            })
-            label.post { updateLabelPosition(slider, label) }
-            return
-        }
-
-        val range = slider.valueTo - slider.valueFrom
-        if (range <= 0f) return
-        val normalizedValue = (slider.value - slider.valueFrom) / range
-        
-        val totalHeight = slider.height.toFloat()
-        val density = resources.displayMetrics.density
-        
-        // Precise thumb center calculation
-        val thumbRadius = slider.thumbRadius.toFloat()
-        val trackTop = slider.paddingTop + thumbRadius
-        val trackBottom = totalHeight - slider.paddingBottom - thumbRadius
-        val trackLength = trackBottom - trackTop
-        
-        val thumbY = trackBottom - (normalizedValue * trackLength)
-        
-        // Bar extends from thumbY down to container bottom. Clamp the bar top up by the label's
-        // 24dp minimum height so the value label can't extend past the container bottom and clip —
-        // this is what cut off the value number when the slider sat at its minimum.
-        val minLabelHeight = 24f * density
-        val barTopY = thumbY.coerceAtMost(totalHeight - minLabelHeight).coerceAtLeast(0f)
-        
-        // Align label top with barTopY
-        label.translationY = barTopY - label.top
-        
-        // Set label height to fill the remaining space
-        val targetHeight = (totalHeight - barTopY).toInt().coerceAtLeast(minLabelHeight.toInt())
-        if (label.layoutParams.height != targetHeight) {
-            label.layoutParams.height = targetHeight
-            label.requestLayout()
-        }
-
-        // Ensure text stays at top
-        label.gravity = android.view.Gravity.TOP or android.view.Gravity.CENTER_HORIZONTAL
-        label.setPadding(0, (2f * density).toInt(), 0, 0)
-        
-        // Apply theme color to the bar
-        val barColor = when (slider.id) {
-            R.id.sliderLevel, R.id.sliderOrder -> Color.GREEN
-            R.id.sliderThreshold -> Color.CYAN
-            R.id.sliderColor -> Color.YELLOW
-            else -> Color.LTGRAY // FS slider
-        }
-        label.setBackgroundColor(barColor)
-        label.setTextColor(Color.BLACK)
-        label.elevation = 6f * density
-    }
+    private fun updateLabelPosition(slider: Slider, label: TextView?) =
+        updateValueBarLabel(slider, label, barColorForSlider(slider))
 
     private fun Slider.setSafeValue(v: Float) {
         val step = this.stepSize

@@ -589,79 +589,16 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun adjustSliderThickness(slider: Slider, label: TextView?) {
-        slider.post {
-            val density = resources.displayMetrics.density
-            
-            // Set slider to be invisible but interactive
-            slider.trackActiveTintList = ColorStateList.valueOf(Color.TRANSPARENT)
-            slider.trackInactiveTintList = ColorStateList.valueOf(Color.TRANSPARENT)
-            slider.thumbRadius = 0 
-            slider.haloRadius = 0
-            
-            label?.let {
-                it.setBackgroundColor(Color.WHITE)
-                it.setTextColor(Color.BLACK)
-                it.elevation = 6f * density
-                it.minWidth = (40f * density).toInt()
-                it.gravity = android.view.Gravity.CENTER
-                it.setPadding(0, (2f * density).toInt(), 0, 0)
-                // Dynamically size the value text to fit the column (replaces the old fixed 8sp).
-                // Landscape gives each EQ bar far more room, so allow a much larger cap there;
-                // portrait columns are narrow, so keep the smaller cap to avoid over-bloating.
-                val isLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-                it.setMaxTextSizeToFit(it.text.toString(), maxSizeSp = if (isLandscape) 28f else 14f)
-            }
+    private fun barColorForSlider(slider: Slider): Int =
+        if (slider.id == R.id.sliderNoiseFilter || slider.id == R.id.sliderNoiseRise || slider.id == R.id.sliderNoiseFall)
+            Color.CYAN else Color.GREEN
 
-            updateLabelPosition(slider, label)
-        }
-    }
+    // Unified value-bar rendering (see ViewUtils.styleValueBarSlider) — shared with FFT-Viewer & Wavelet.
+    private fun adjustSliderThickness(slider: Slider, label: TextView?) =
+        styleValueBarSlider(slider, label, barColorForSlider(slider))
 
-    private fun updateLabelPosition(slider: Slider, label: TextView?) {
-        if (label == null) return
-        if (slider.isGone || label.isGone) return
-
-        if (slider.height == 0 || label.height == 0 || label.layout == null) {
-            label.viewTreeObserver.addOnGlobalLayoutListener(object : ViewTreeObserver.OnGlobalLayoutListener {
-                override fun onGlobalLayout() {
-                    if (label.height > 0 && label.layout != null && slider.height > 0) {
-                        label.viewTreeObserver.removeOnGlobalLayoutListener(this)
-                        updateLabelPosition(slider, label)
-                    }
-                }
-            })
-            label.post { updateLabelPosition(slider, label) }
-            return
-        }
-
-        val range = slider.valueTo - slider.valueFrom
-        if (range <= 0f) return
-        val normalizedValue = (slider.value - slider.valueFrom) / range
-        
-        val totalHeight = slider.height.toFloat()
-        val density = resources.displayMetrics.density
-        
-        val handleHeight = 24f * density
-        val availableLength = totalHeight - handleHeight
-        val barTopY = availableLength - (normalizedValue * availableLength)
-        
-        label.translationY = barTopY - label.top
-        
-        val targetHeight = (totalHeight - barTopY).toInt().coerceAtLeast(handleHeight.toInt())
-        if (label.layoutParams.height != targetHeight) {
-            label.layoutParams.height = targetHeight
-            label.requestLayout()
-        }
-
-        val barColor = if (slider.id == R.id.sliderNoiseFilter || slider.id == R.id.sliderNoiseRise || slider.id == R.id.sliderNoiseFall) {
-            Color.CYAN
-        } else {
-            Color.GREEN
-        }
-        label.setBackgroundColor(barColor)
-        label.setTextColor(Color.BLACK)
-        label.elevation = 6f * density
-    }
+    private fun updateLabelPosition(slider: Slider, label: TextView?) =
+        updateValueBarLabel(slider, label, barColorForSlider(slider))
 
     private var activeEncoding = AudioFormat.ENCODING_PCM_FLOAT
 

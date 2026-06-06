@@ -7,4 +7,5 @@
     <item name="tag_fit_dims" type="id" />
     <item name="tag_fit_pending" type="id" />
     <item name="tag_pos_pending" type="id" />
+    <item name="tag_value_max_sp" type="id" />
 </resources>

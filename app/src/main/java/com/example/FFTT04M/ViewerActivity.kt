@@ -163,28 +163,21 @@ class ViewerActivity : AppCompatActivity() {
             }
         }
 
-        // Dynamically size labels with size caps to prevent portrait bloat
+        // Headers ("100 Hz", "Rise Time"): one consistent size — portrait keeps the established 11sp;
+        // landscape gets a larger cap so labels aren't dwarfed by the wider bars. Value labels are now
+        // auto-sized by the shared styleValueBarSlider(), so they're not re-fitted here.
         val headerIds = intArrayOf(R.id.lblEq100, R.id.lblEq300, R.id.lblEq1k, R.id.lblEq3k, R.id.lblEq8k, R.id.lblFilterPercent, R.id.lblFilterRise, R.id.lblFilterFall)
-        val valueIds = intArrayOf(R.id.txtEq100Value, R.id.txtEq300Value, R.id.txtEq1kValue, R.id.txtEq3kValue, R.id.txtEq8kValue, R.id.vTxtFilterValue, R.id.vTxtRiseValue, R.id.vTxtFallValue)
         val buttonIds = intArrayOf(R.id.btnViewerGalleryTop, R.id.btnViewerListenTop, R.id.btnViewerWavelet, R.id.btnViewerNote, R.id.btnViewerPlay)
+        val isLandscape = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        val headerCap = if (isLandscape) 20f else 11f
 
-        // Cap header labels to 11sp (band names like "100 Hz")
         for (id in headerIds) {
             val tv = findViewById<TextView>(id) ?: continue
             if ((tv.visibility == View.VISIBLE) && ((tv.parent as? View)?.width ?: 0 > 0)) {
-                tv.setMaxTextSizeToFit(tv.text.toString(), maxSizeSp = 11f)
+                tv.setMaxTextSizeToFit(tv.text.toString(), maxSizeSp = headerCap)
             }
         }
 
-        // Cap value labels to 12sp (dB, %, ms values)
-        for (id in valueIds) {
-            val tv = findViewById<TextView>(id) ?: continue
-            if ((tv.visibility == View.VISIBLE) && ((tv.parent as? View)?.width ?: 0 > 0)) {
-                tv.setMaxTextSizeToFit(tv.text.toString(), maxSizeSp = 12f)
-            }
-        }
-
-        // Cap button labels to 10sp
         for (id in buttonIds) {
             val tv = findViewById<TextView>(id) ?: continue
             if ((tv.visibility == View.VISIBLE) && ((tv.parent as? View)?.width ?: 0 > 0)) {
@@ -1596,103 +1589,14 @@ class ViewerActivity : AppCompatActivity() {
         stopAudio()
     }
 
-    private fun adjustSliderThickness(slider: Slider, label: TextView?) {
-        slider.post {
-            val parent = slider.parent as? android.view.View ?: return@post
-            val availableWidth = parent.width.toFloat()
-            if (availableWidth <= 0) return@post
+    private fun barColorForSlider(slider: Slider): Int =
+        if (slider.id == R.id.vSliderNoiseFilter || slider.id == R.id.vSliderNoiseRise || slider.id == R.id.vSliderNoiseFall)
+            Color.CYAN else Color.GREEN
 
-            val density = resources.displayMetrics.density
-            
-            // Set slider to be invisible but interactive
-            slider.setTrackActiveTintList(android.content.res.ColorStateList.valueOf(Color.TRANSPARENT))
-            slider.setTrackInactiveTintList(android.content.res.ColorStateList.valueOf(Color.TRANSPARENT))
-            slider.setThumbTintList(android.content.res.ColorStateList.valueOf(Color.TRANSPARENT))
-            slider.setHaloTintList(android.content.res.ColorStateList.valueOf(Color.TRANSPARENT))
-            
-        // Set text box appearance
-        label?.let {
-            it.setBackgroundColor(Color.WHITE)
-            it.setTextColor(Color.BLACK)
-            it.elevation = 6f * density
-            it.minWidth = (40f * density).toInt()
-            it.textSize = 8f
-            it.gravity = android.view.Gravity.CENTER
-            it.setPadding(0, (2f * density).toInt(), 0, 0)
-        }
+    // Unified value-bar rendering (see ViewUtils.styleValueBarSlider) — shared with Listen & Wavelet.
+    private fun adjustSliderThickness(slider: Slider, label: TextView?) =
+        styleValueBarSlider(slider, label, barColorForSlider(slider))
 
-            slider.post {
-                val labelWidth = label?.width ?: 0
-                if (labelWidth > 0) {
-                    slider.trackHeight = labelWidth
-                    updateLabelPosition(slider, label)
-                }
-            }
-        }
-    }
-
-    private fun updateLabelPosition(slider: Slider, label: TextView?) {
-        if (label == null) return
-        
-        // If the view is effectively hidden (GONE), skip to avoid infinite layout loops.
-        if (slider.isGone || label.isGone) return
-
-        // Ensure dimensions and layout are ready. Defer via a SINGLE guarded post — never an
-        // OnGlobalLayoutListener: on a tab switch many labels are height-0 at once, and a listener
-        // that calls requestLayout() re-triggers every other still-registered listener, cascading
-        // into a layout storm / ANR (the tab-switch freeze). The post runs after this layout pass,
-        // by which point the now-visible slider has a height; the pending flag prevents stacking.
-        if (slider.height == 0 || label.height == 0 || label.layout == null) {
-            if (label.getTag(R.id.tag_pos_pending) != true) {
-                label.setTag(R.id.tag_pos_pending, true)
-                label.post {
-                    label.setTag(R.id.tag_pos_pending, null)
-                    updateLabelPosition(slider, label)
-                }
-            }
-            return
-        }
-
-        val range = slider.valueTo - slider.valueFrom
-        if (range <= 0f) return
-        val normalizedValue = (slider.value - slider.valueFrom) / range
-        
-        val totalHeight = slider.height.toFloat()
-        val density = resources.displayMetrics.density
-        
-        // Precise thumb center calculation
-        val thumbRadius = slider.thumbRadius.toFloat()
-        val trackTop = slider.paddingTop + thumbRadius
-        val trackBottom = totalHeight - slider.paddingBottom - thumbRadius
-        val trackLength = trackBottom - trackTop
-        
-        val thumbY = trackBottom - (normalizedValue * trackLength)
-        
-        // Bar extends from thumbY down to container bottom
-        val barTopY = thumbY
-        
-        // Align label top with barTopY
-        label.translationY = barTopY - label.top
-        
-        // Set label height to fill the remaining space
-        val targetHeight = (totalHeight - barTopY).toInt().coerceAtLeast((18f * density).toInt())
-        if (label.layoutParams.height != targetHeight) {
-            label.layoutParams.height = targetHeight
-            label.requestLayout()
-        }
-
-        // Ensure text stays at top
-        label.gravity = android.view.Gravity.TOP or android.view.Gravity.CENTER_HORIZONTAL
-        label.setPadding(0, (2f * density).toInt(), 0, 0)
-        
-        // Apply theme color to the bar
-        val barColor = if (slider.id == R.id.vSliderNoiseFilter || slider.id == R.id.vSliderNoiseRise || slider.id == R.id.vSliderNoiseFall) {
-            Color.CYAN
-        } else {
-            Color.GREEN
-        }
-        label.setBackgroundColor(barColor)
-        label.setTextColor(Color.BLACK)
-        label.elevation = 6f * density
-    }
+    private fun updateLabelPosition(slider: Slider, label: TextView?) =
+        updateValueBarLabel(slider, label, barColorForSlider(slider))
 }
