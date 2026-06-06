@@ -160,7 +160,7 @@ class MainActivity : AppCompatActivity() {
         findViewById<android.view.ViewGroup>(android.R.id.content).post {
             updateAllLabelPositions()
             fitSpinner(micSpinner)
-            colorSpinner?.let { styleColorSpinner(it, prefs.getInt("color_scheme", 0)) }
+            colorSpinner?.let { (it.adapter as? android.widget.BaseAdapter)?.notifyDataSetChanged() }
         }
 
         applyAutoSizeText(findViewById(android.R.id.content))
@@ -389,44 +389,52 @@ class MainActivity : AppCompatActivity() {
 
         val colorNames = arrayOf("Default", "Viridis", "Magma", "Gray")
         val displayNames = colorNames.map { "Color:$it" }
-        val adapter = ArrayAdapter(this, R.layout.spinner_item_gold, displayNames)
+        // Custom adapter: the *closed* caption always renders "COLOR" at the GALLERY button's font
+        // size with the scheme's reversed colours. Doing it in getView() makes it immune to the
+        // spinner re-rendering its selected view (which reverted setTextSize before).
+        val adapter = object : ArrayAdapter<String>(this, R.layout.spinner_item_gold, displayNames) {
+            override fun getView(position: Int, convertView: View?, parent: android.view.ViewGroup): View {
+                val tv = super.getView(position, convertView, parent) as TextView
+                styleColorCaption(tv)
+                return tv
+            }
+        }
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         spinner.adapter = adapter
 
         val savedColorScheme = prefs.getInt("color_scheme", 0)
         spinner.setSelection(savedColorScheme)
         fftHeatMap.setColorScheme(savedColorScheme)
-        styleColorSpinner(spinner, savedColorScheme)
 
         spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
                 fftHeatMap.setColorScheme(position)
                 prefs.edit { putInt("color_scheme", position) }
-                styleColorSpinner(spinner, position)
+                adapter.notifyDataSetChanged()
             }
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
+        // GALLERY's autosized size isn't final until after layout settles; re-render the caption a
+        // couple of times so it picks up GALLERY's final size.
+        spinner.postDelayed({ adapter.notifyDataSetChanged() }, 150)
+        spinner.postDelayed({ adapter.notifyDataSetChanged() }, 500)
     }
 
-    /** Borrowed COLOR-control appearance (from FFTT02M): caption "COLOR", text=low-value color, bg=high-value color (REVERSED). */
-    private fun styleColorSpinner(spinner: Spinner, schemeIdx: Int) {
-        spinner.post {
-            val bg = fftHeatMap.highColorFor(schemeIdx)
-            val fg = fftHeatMap.lowColorFor(schemeIdx)
-            spinner.setBackgroundColor(bg)
-            (spinner.selectedView as? android.widget.TextView)?.apply {
-                setTextColor(fg)
-                setBackgroundColor(bg)
-                // Cap the COLOR caption at the GALLERY button's actual rendered size so it's the same
-                // font size as the other Listen buttons. setMaxTextSizeToFit defers until layout is
-                // ready (so the cap survives the spinner re-rendering its selected view).
-                val gallery = findViewById<android.widget.Button>(R.id.btnGallery)
-                val cap = if (gallery != null && gallery.textSize > 0f)
-                    gallery.textSize / resources.displayMetrics.scaledDensity
-                else 12f * uiScale(resources)
-                setMaxTextSizeToFit("COLOR", maxSizeSp = cap)
-            }
-        }
+    /** Caption for the COLOR spinner: "COLOR" in the scheme's reversed colours, sized to match the
+     *  GALLERY button so it's the same font size as the other Listen buttons. */
+    private fun styleColorCaption(tv: TextView) {
+        val idx = prefs.getInt("color_scheme", 0)
+        tv.text = "COLOR"
+        tv.gravity = android.view.Gravity.CENTER
+        tv.setBackgroundColor(fftHeatMap.highColorFor(idx))
+        tv.setTextColor(fftHeatMap.lowColorFor(idx))
+        val sd = resources.displayMetrics.scaledDensity
+        val gallery = findViewById<android.widget.Button>(R.id.btnGallery)
+        val sp = if (gallery != null && gallery.textSize >= 9f * sd) gallery.textSize / sd
+                 else 14f * uiScale(resources)
+        androidx.core.widget.TextViewCompat.setAutoSizeTextTypeWithDefaults(
+            tv, androidx.core.widget.TextViewCompat.AUTO_SIZE_TEXT_TYPE_NONE)
+        tv.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, sp)
     }
 
     /** On big (tablet) screens, thicken the landscape top buttons proportionally so they aren't stuck
