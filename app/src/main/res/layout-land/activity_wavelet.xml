@@ -120,7 +120,7 @@
             android:layout_marginTop="2dp">
 
             <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:orientation="vertical" android:gravity="center_horizontal">
-                <TextView android:layout_width="match_parent" android:layout_height="20dp" android:gravity="center" android:text="LEVEL" android:maxLines="1" android:textColor="#FFFFFF" android:textSize="9sp" android:textStyle="bold"/>
+                <TextView android:layout_width="match_parent" android:layout_height="28dp" android:gravity="center" android:text="LEVEL" android:maxLines="1" android:textColor="#FFFFFF" android:textSize="9sp" android:textStyle="bold"/>
                 <FrameLayout android:layout_width="match_parent" android:layout_height="match_parent">
                     <com.google.android.material.slider.Slider android:id="@+id/sliderLevel" android:layout_width="match_parent" android:layout_height="match_parent" android:valueFrom="1.0" android:valueTo="8.0" android:value="4.0" android:stepSize="1.0" android:orientation="vertical" app:labelBehavior="gone" app:trackHeight="24dp" app:thumbRadius="12dp" app:thumbColor="#FFFFFF" app:trackColorActive="#00FF00" app:trackColorInactive="#333333" android:layout_gravity="center" />
                     <TextView android:id="@+id/txtLevelValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="4" android:textColor="#000000" android:textSize="9sp" android:textStyle="bold" android:layout_gravity="top|center_horizontal" android:elevation="4dp"/>
@@ -128,7 +128,7 @@
             </LinearLayout>
 
             <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:orientation="vertical" android:gravity="center_horizontal">
-                <TextView android:layout_width="match_parent" android:layout_height="20dp" android:gravity="center" android:text="ORDER" android:maxLines="1" android:textColor="#FFFFFF" android:textSize="9sp" android:textStyle="bold"/>
+                <TextView android:layout_width="match_parent" android:layout_height="28dp" android:gravity="center" android:text="ORDER" android:maxLines="1" android:textColor="#FFFFFF" android:textSize="9sp" android:textStyle="bold"/>
                 <FrameLayout android:layout_width="match_parent" android:layout_height="match_parent">
                     <com.google.android.material.slider.Slider android:id="@+id/sliderOrder" android:layout_width="match_parent" android:layout_height="match_parent" android:valueFrom="1.0" android:valueTo="10.0" android:value="1.0" android:stepSize="1.0" android:orientation="vertical" app:labelBehavior="gone" app:trackHeight="24dp" app:thumbRadius="12dp" app:thumbColor="#FFFFFF" app:trackColorActive="#00FF00" app:trackColorInactive="#333333" android:layout_gravity="center" />
                     <TextView android:id="@+id/txtOrderValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="1" android:textColor="#000000" android:textSize="9sp" android:textStyle="bold" android:layout_gravity="top|center_horizontal" android:elevation="4dp"/>
@@ -136,7 +136,7 @@
             </LinearLayout>
 
             <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:orientation="vertical" android:gravity="center_horizontal">
-                <TextView android:layout_width="match_parent" android:layout_height="20dp" android:gravity="center" android:text="SAMPLE" android:maxLines="1" android:textColor="#FFFFFF" android:textSize="9sp" android:textStyle="bold"/>
+                <TextView android:layout_width="match_parent" android:layout_height="28dp" android:gravity="center" android:text="SAMPLE" android:maxLines="1" android:textColor="#FFFFFF" android:textSize="9sp" android:textStyle="bold"/>
                 <FrameLayout android:layout_width="match_parent" android:layout_height="match_parent">
                     <com.google.android.material.slider.Slider android:id="@+id/sliderSampling" android:layout_width="match_parent" android:layout_height="match_parent" android:valueFrom="1000.0" android:valueTo="44100.0" android:value="44100.0" android:stepSize="1.0" android:orientation="vertical" app:labelBehavior="gone" app:trackHeight="24dp" app:thumbRadius="12dp" app:thumbColor="#FFFFFF" app:trackColorActive="#AAAAAA" app:trackColorInactive="#333333" android:layout_gravity="center" />
                     <TextView android:id="@+id/txtSamplingValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="44k" android:textColor="#000000" android:textSize="9sp" android:textStyle="bold" android:layout_gravity="top|center_horizontal" android:elevation="4dp"/>
@@ -144,7 +144,7 @@
             </LinearLayout>
 
             <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:orientation="vertical" android:gravity="center_horizontal">
-                <TextView android:layout_width="match_parent" android:layout_height="20dp" android:gravity="center" android:text="THRESH" android:maxLines="1" android:textColor="#FFFFFF" android:textSize="9sp" android:textStyle="bold"/>
+                <TextView android:layout_width="match_parent" android:layout_height="28dp" android:gravity="center" android:text="THRESH" android:maxLines="1" android:textColor="#FFFFFF" android:textSize="9sp" android:textStyle="bold"/>
                 <FrameLayout android:layout_width="match_parent" android:layout_height="match_parent">
                     <com.google.android.material.slider.Slider android:id="@+id/sliderThreshold" android:layout_width="match_parent" android:layout_height="match_parent" android:valueFrom="0.0" android:valueTo="9.0" android:value="4.0" android:stepSize="1.0" android:orientation="vertical" app:labelBehavior="gone" app:trackHeight="24dp" app:thumbRadius="12dp" app:thumbColor="#FFFFFF" app:trackColorActive="#00FFFF" app:trackColorInactive="#333333" android:layout_gravity="center" />
                     <TextView android:id="@+id/txtThresholdValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0.1" android:textColor="#000000" android:textSize="9sp" android:textStyle="bold" android:layout_gravity="top|center_horizontal" android:elevation="4dp"/>
