@@ -54,11 +54,16 @@
             android:layout_marginBottom="4dp"
             android:gravity="center_vertical"
             android:weightSum="5">
-            <Button android:id="@+id/btnViewerGalleryTop" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginEnd="2dp" android:text="@string/btn_gallery" android:backgroundTint="#FFFF00" android:textColor="#000000" android:textSize="9sp" android:textStyle="bold" android:minWidth="0dp" android:insetTop="0dp" android:insetBottom="0dp" android:singleLine="true" android:padding="0dp" style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
-            <Button android:id="@+id/btnViewerListenTop" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginEnd="2dp" android:text="LISTEN" android:backgroundTint="#00FFFF" android:textColor="#000000" android:textSize="9sp" android:textStyle="bold" android:minWidth="0dp" android:insetTop="0dp" android:insetBottom="0dp" android:singleLine="true" android:padding="0dp" style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
-            <Button android:id="@+id/btnViewerWavelet" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginEnd="2dp" android:text="@string/btn_wave" android:backgroundTint="#FFFF00" android:textColor="#000000" android:textSize="9sp" android:textStyle="bold" android:minWidth="0dp" android:insetTop="0dp" android:insetBottom="0dp" android:singleLine="true" android:padding="0dp" style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
-            <Button android:id="@+id/btnViewerNote" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginEnd="2dp" android:text="NOTE" android:backgroundTint="#FFFFFF" android:textColor="#000000" android:textSize="9sp" android:textStyle="bold" android:minWidth="0dp" android:insetTop="0dp" android:insetBottom="0dp" android:singleLine="true" android:padding="0dp" style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
-            <Button android:id="@+id/btnViewerPlay" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:text="@string/btn_play" android:backgroundTint="#90EE90" android:textColor="#000000" android:textSize="9sp" android:textStyle="bold" android:minWidth="0dp" android:insetTop="0dp" android:insetBottom="0dp" android:singleLine="true" android:padding="0dp" style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
+            <Button android:id="@+id/btnViewerGalleryTop" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginEnd="2dp" android:text="@string/btn_gallery" android:backgroundTint="#FFFF00" android:textColor="#000000" android:textSize="8sp" android:textStyle="bold" android:minWidth="0dp"
+                android:minHeight="0dp" android:insetTop="0dp" android:insetBottom="0dp" android:singleLine="true" android:padding="0dp" style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
+            <Button android:id="@+id/btnViewerListenTop" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginEnd="2dp" android:text="LISTEN" android:backgroundTint="#00FFFF" android:textColor="#000000" android:textSize="8sp" android:textStyle="bold" android:minWidth="0dp"
+                android:minHeight="0dp" android:insetTop="0dp" android:insetBottom="0dp" android:singleLine="true" android:padding="0dp" style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
+            <Button android:id="@+id/btnViewerWavelet" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginEnd="2dp" android:text="@string/btn_wave" android:backgroundTint="#FFFF00" android:textColor="#000000" android:textSize="8sp" android:textStyle="bold" android:minWidth="0dp"
+                android:minHeight="0dp" android:insetTop="0dp" android:insetBottom="0dp" android:singleLine="true" android:padding="0dp" style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
+            <Button android:id="@+id/btnViewerNote" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginEnd="2dp" android:text="NOTE" android:backgroundTint="#FFFFFF" android:textColor="#000000" android:textSize="8sp" android:textStyle="bold" android:minWidth="0dp"
+                android:minHeight="0dp" android:insetTop="0dp" android:insetBottom="0dp" android:singleLine="true" android:padding="0dp" style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
+            <Button android:id="@+id/btnViewerPlay" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:text="@string/btn_play" android:backgroundTint="#90EE90" android:textColor="#000000" android:textSize="8sp" android:textStyle="bold" android:minWidth="0dp"
+                android:minHeight="0dp" android:insetTop="0dp" android:insetBottom="0dp" android:singleLine="true" android:padding="0dp" style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
         </LinearLayout>
 
         <com.google.android.material.tabs.TabLayout
@@ -145,7 +150,7 @@
             android:clipToPadding="false">
 
             <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="10" android:orientation="vertical" android:clipChildren="false" android:clipToPadding="false">
-                <TextView android:id="@+id/lblFilterPercent" android:layout_width="wrap_content" android:layout_height="0dp" android:layout_weight="0.4" android:text="@string/label_filter_percent" android:textColor="#00FFFF" android:textSize="7sp" android:textStyle="bold" android:gravity="bottom|center_horizontal" android:lines="2" android:includeFontPadding="false"/>
+                <TextView android:id="@+id/lblFilterPercent" android:layout_width="wrap_content" android:layout_height="0dp" android:layout_weight="0.4" android:text="@string/label_filter_percent" android:textColor="#00FFFF" android:textSize="8sp" android:textStyle="bold" android:gravity="bottom|center_horizontal" android:maxLines="2" android:includeFontPadding="false"/>
                 <FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1.7" android:clipChildren="false" android:clipToPadding="false">
                     <com.google.android.material.slider.Slider android:id="@+id/vSliderNoiseFilter" android:layout_width="match_parent" android:layout_height="match_parent" android:valueFrom="0.0" android:valueTo="1.0" android:value="0.0" android:stepSize="0.01" android:orientation="vertical" app:labelBehavior="gone" app:trackHeight="24dp" app:thumbRadius="12dp" app:trackColorActive="#00FFFF" app:trackColorInactive="#007F7F" android:layout_gravity="top|center_horizontal"/>
                     <TextView android:id="@+id/vTxtFilterValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/label_0pct" android:textColor="#000000" android:textSize="8sp" android:textStyle="bold" android:gravity="center" android:layout_gravity="top|center_horizontal" android:elevation="4dp" android:includeFontPadding="false"/>
@@ -154,7 +159,7 @@
             <View android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
 
             <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="10" android:orientation="vertical" android:clipChildren="false" android:clipToPadding="false">
-                <TextView android:id="@+id/lblFilterRise" android:layout_width="wrap_content" android:layout_height="0dp" android:layout_weight="0.4" android:text="@string/label_rise_time" android:textColor="#00FFFF" android:textSize="7sp" android:textStyle="bold" android:gravity="bottom|center_horizontal" android:lines="2" android:includeFontPadding="false"/>
+                <TextView android:id="@+id/lblFilterRise" android:layout_width="wrap_content" android:layout_height="0dp" android:layout_weight="0.4" android:text="@string/label_rise_time" android:textColor="#00FFFF" android:textSize="8sp" android:textStyle="bold" android:gravity="bottom|center_horizontal" android:maxLines="2" android:includeFontPadding="false"/>
                 <FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1.7" android:clipChildren="false" android:clipToPadding="false">
                     <com.google.android.material.slider.Slider android:id="@+id/vSliderNoiseRise" android:layout_width="match_parent" android:layout_height="match_parent" android:valueFrom="0.0" android:valueTo="3.0" android:value="1.7" android:stepSize="0.01" android:orientation="vertical" app:labelBehavior="gone" app:trackHeight="24dp" app:thumbRadius="12dp" app:trackColorActive="#00FFFF" app:trackColorInactive="#007F7F" android:layout_gravity="top|center_horizontal"/>
                     <TextView android:id="@+id/vTxtRiseValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/label_0ms" android:textColor="#000000" android:textSize="8sp" android:textStyle="bold" android:gravity="center" android:layout_gravity="top|center_horizontal" android:elevation="4dp" android:includeFontPadding="false"/>
@@ -163,7 +168,7 @@
             <View android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
 
             <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="10" android:orientation="vertical" android:clipChildren="false" android:clipToPadding="false">
-                <TextView android:id="@+id/lblFilterFall" android:layout_width="wrap_content" android:layout_height="0dp" android:layout_weight="0.4" android:text="@string/label_fall_time" android:textColor="#00FFFF" android:textSize="7sp" android:textStyle="bold" android:gravity="bottom|center_horizontal" android:lines="2" android:includeFontPadding="false"/>
+                <TextView android:id="@+id/lblFilterFall" android:layout_width="wrap_content" android:layout_height="0dp" android:layout_weight="0.4" android:text="@string/label_fall_time" android:textColor="#00FFFF" android:textSize="8sp" android:textStyle="bold" android:gravity="bottom|center_horizontal" android:maxLines="2" android:includeFontPadding="false"/>
                 <FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1.7" android:clipChildren="false" android:clipToPadding="false">
                     <com.google.android.material.slider.Slider android:id="@+id/vSliderNoiseFall" android:layout_width="match_parent" android:layout_height="match_parent" android:valueFrom="0.0" android:valueTo="3.0" android:value="2.3" android:stepSize="0.01" android:orientation="vertical" app:labelBehavior="gone" app:trackHeight="24dp" app:thumbRadius="12dp" app:trackColorActive="#00FFFF" app:trackColorInactive="#007F7F" android:layout_gravity="top|center_horizontal"/>
                     <TextView android:id="@+id/vTxtFallValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/label_0ms" android:textColor="#000000" android:textSize="8sp" android:textStyle="bold" android:gravity="center" android:layout_gravity="top|center_horizontal" android:elevation="4dp" android:includeFontPadding="false"/>
@@ -198,17 +203,20 @@
 
             <Button
                 android:id="@+id/btnViewerSweep"
+                android:padding="0dp"
                 android:layout_width="match_parent"
                 android:layout_height="44dp"
                 android:layout_marginBottom="4dp"
                 android:text="@string/sweep_off"
                 android:backgroundTint="#FF69B4"
                 android:textColor="#FFFFFF"
-                android:textSize="9sp"
+                android:textSize="8sp"
                 android:textStyle="bold"
                 android:minWidth="0dp"
+                android:minHeight="0dp"
                 android:insetTop="0dp"
                 android:insetBottom="0dp" />
+                style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
 
             <Spinner
                 android:id="@+id/vColorSpinner"
