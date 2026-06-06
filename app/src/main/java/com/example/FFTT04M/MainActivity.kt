@@ -154,6 +154,7 @@ class MainActivity : AppCompatActivity() {
             noiseFilterStrength = prefs.getFloat("noise_filter_strength", 0f)
             val savedColorScheme = prefs.getInt("color_scheme", 0)
             fftHeatMap.setColorScheme(savedColorScheme)
+            scaleLandscapeControls()
         }
 
         findViewById<android.view.ViewGroup>(android.R.id.content).post {
@@ -416,7 +417,24 @@ class MainActivity : AppCompatActivity() {
             (spinner.selectedView as? android.widget.TextView)?.apply {
                 setTextColor(fg)
                 setBackgroundColor(bg)
-                setMaxTextSizeToFit("COLOR")
+                // Cap so "COLOR" matches the adjacent GALLERY button instead of ballooning to fill width.
+                setMaxTextSizeToFit("COLOR", maxSizeSp = 12f * uiScale(resources))
+            }
+        }
+    }
+
+    /** On big (tablet) screens, thicken the landscape top buttons proportionally so they aren't stuck
+     *  at phone size. Fonts scale via uiScale() elsewhere; this matches the button heights to them. */
+    private fun scaleLandscapeControls() {
+        val s = uiScale(resources)
+        if (s <= 1.01f) return
+        intArrayOf(R.id.btnQuitTop, R.id.btnGallery, R.id.btnLatency).forEach { id ->
+            findViewById<View>(id)?.let { v ->
+                val lp = v.layoutParams ?: return@let
+                if (lp.height > 0) {
+                    lp.height = (lp.height * s).toInt()
+                    v.layoutParams = lp
+                }
             }
         }
     }
