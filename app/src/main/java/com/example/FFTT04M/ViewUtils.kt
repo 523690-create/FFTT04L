@@ -47,8 +47,10 @@ fun applyAutoSizeText(root: View, minSp: Int = 6, maxSp: Int = 18) {
     } else if (root is TextView) { // Button is a TextView too
         // Skip the specific label IDs
         if (root.id !in skipIds) {
+            // Scale the cap with screen size so a tablet isn't capped at phone-sized text.
+            val scaledMax = (maxSp * uiScale(root.resources)).toInt().coerceAtLeast(minSp + 1)
             TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(
-                root, minSp, maxSp, 1, TypedValue.COMPLEX_UNIT_SP
+                root, minSp, scaledMax, 1, TypedValue.COMPLEX_UNIT_SP
             )
         }
     }
@@ -166,6 +168,12 @@ fun TextView.setMaxTextSizeToFit(
 // thumb slightly lighter than the bar. Default ticks remain as a faint centred "dotted line".
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Screen-size UI scale so fixed sp/dp grow proportionally on bigger screens. Baseline 411dp (a
+ *  large phone) → phones ≈ 1.0; ~1.7 on a 700dp tablet. Use it to multiply font caps and control
+ *  heights so a tablet isn't stuck with phone-sized text/buttons. */
+fun uiScale(res: android.content.res.Resources): Float =
+    (res.configuration.smallestScreenWidthDp / 411f).coerceIn(1.0f, 2.2f)
+
 /** Blend [color] toward white by [fraction] (0 = unchanged, 1 = white). */
 fun lightenColor(color: Int, fraction: Float): Int {
     val r = (Color.red(color) + (255 - Color.red(color)) * fraction).toInt().coerceIn(0, 255)
@@ -209,7 +217,7 @@ fun styleValueBarSlider(slider: Slider, label: TextView?, barColor: Int, valueMa
             lab.layoutParams = lp
             lab.minWidth = barWidth
             lab.maxWidth = barWidth
-            lab.setTag(R.id.tag_value_max_sp, valueMaxSp)
+            lab.setTag(R.id.tag_value_max_sp, valueMaxSp * uiScale(slider.resources))
         }
 
         slider.post { updateValueBarLabel(slider, label, barColor) }
@@ -272,7 +280,7 @@ fun updateValueBarLabel(slider: Slider, label: TextView?, barColor: Int) {
     val thumbY = trackBottom - (normalized * trackLength)
 
     // Clamp so a value at the minimum still shows a bar tall enough for the (≤2-line) value text.
-    val minH = 46f * density
+    val minH = 46f * density * uiScale(slider.resources)
     val barTopY = thumbY.coerceAtMost(totalHeight - minH).coerceAtLeast(0f)
     label.translationY = barTopY - label.top
 

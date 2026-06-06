@@ -169,7 +169,7 @@ class ViewerActivity : AppCompatActivity() {
         val headerIds = intArrayOf(R.id.lblEq100, R.id.lblEq300, R.id.lblEq1k, R.id.lblEq3k, R.id.lblEq8k, R.id.lblFilterPercent, R.id.lblFilterRise, R.id.lblFilterFall)
         val buttonIds = intArrayOf(R.id.btnViewerGalleryTop, R.id.btnViewerListenTop, R.id.btnViewerWavelet, R.id.btnViewerNote, R.id.btnViewerPlay)
         val isLandscape = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-        val headerCap = if (isLandscape) 20f else 11f
+        val headerCap = (if (isLandscape) 20f else 11f) * uiScale(resources)
 
         for (id in headerIds) {
             val tv = findViewById<TextView>(id) ?: continue
