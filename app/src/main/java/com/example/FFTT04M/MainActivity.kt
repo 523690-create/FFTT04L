@@ -417,8 +417,14 @@ class MainActivity : AppCompatActivity() {
             (spinner.selectedView as? android.widget.TextView)?.apply {
                 setTextColor(fg)
                 setBackgroundColor(bg)
-                // Cap so "COLOR" matches the adjacent GALLERY button instead of ballooning to fill width.
-                setMaxTextSizeToFit("COLOR", maxSizeSp = 12f * uiScale(resources))
+                // Cap the COLOR caption at the GALLERY button's actual rendered size so it's the same
+                // font size as the other Listen buttons. setMaxTextSizeToFit defers until layout is
+                // ready (so the cap survives the spinner re-rendering its selected view).
+                val gallery = findViewById<android.widget.Button>(R.id.btnGallery)
+                val cap = if (gallery != null && gallery.textSize > 0f)
+                    gallery.textSize / resources.displayMetrics.scaledDensity
+                else 12f * uiScale(resources)
+                setMaxTextSizeToFit("COLOR", maxSizeSp = cap)
             }
         }
     }
