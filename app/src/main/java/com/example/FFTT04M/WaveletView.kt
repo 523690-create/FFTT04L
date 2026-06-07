@@ -100,35 +100,8 @@ class WaveletView @JvmOverloads constructor(
     private var lastTouchY = 0f
 
     // Color schemes
-    private val colorSchemes = arrayOf(
-        intArrayOf( // 0: Heat (Original 7-color)
-            Color.parseColor("#4B0082"), // Indigo
-            Color.BLUE,
-            Color.CYAN,
-            Color.GREEN,
-            Color.YELLOW,
-            Color.parseColor("#FFA500"), // Orange
-            Color.RED
-        ),
-        intArrayOf( // 1: Viridis
-            Color.parseColor("#440154"),
-            Color.parseColor("#3b528b"),
-            Color.parseColor("#21918c"),
-            Color.parseColor("#5ec962"),
-            Color.parseColor("#fde725")
-        ),
-        intArrayOf( // 2: Magma
-            Color.parseColor("#000004"),
-            Color.parseColor("#3b0f70"),
-            Color.parseColor("#8c2981"),
-            Color.parseColor("#fe9f6d"),
-            Color.parseColor("#fcfdbf")
-        ),
-        intArrayOf( // 3: Grayscale
-            Color.BLACK,
-            Color.WHITE
-        )
-    )
+    // Colour schemes are now defined once in ColorMaps as 256-entry LUTs (shared with FFTHeatMapView).
+    private val colorSchemes = ColorMaps.luts
     private var activeColors = colorSchemes[0]
 
     /** Lowest-value (bottom-of-scale) color of a scheme - used as the COLOR control background. */

@@ -387,7 +387,7 @@ class MainActivity : AppCompatActivity() {
         val spinner = colorSpinner ?: return
         if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) return
 
-        val colorNames = arrayOf("Default", "Viridis", "Magma", "Gray")
+        val colorNames = ColorMaps.names
         val displayNames = colorNames.map { "Color:$it" }
         // Custom adapter: the *closed* caption always renders "COLOR" at the GALLERY button's font
         // size with the scheme's reversed colours. Doing it in getView() makes it immune to the

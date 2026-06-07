@@ -36,10 +36,10 @@
             android:layout_marginBottom="4dp"
             android:gravity="center_vertical"
             android:weightSum="3">
-            <!-- COLOR Spinner: render naturally first -->
-            <Spinner android:id="@+id/vColorSpinner" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:background="@android:color/transparent" android:overlapAnchor="false" />
-            <Button android:id="@+id/btnWaveletGalleryTop" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="4dp" android:layout_marginEnd="4dp" android:text="@string/btn_gallery" android:backgroundTint="#FFFF00" android:textColor="#000000" android:textSize="10sp" android:textStyle="bold" android:minWidth="0dp" android:minHeight="0dp" android:padding="6dp" style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
+            <Button android:id="@+id/btnWaveletGalleryTop" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginEnd="4dp" android:text="@string/btn_gallery" android:backgroundTint="#FFFF00" android:textColor="#000000" android:textSize="10sp" android:textStyle="bold" android:minWidth="0dp" android:minHeight="0dp" android:padding="6dp" style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
             <Button android:id="@+id/btnWaveletListenTop" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginEnd="4dp" android:text="LISTEN" android:backgroundTint="#00FFFF" android:textColor="#000000" android:textSize="10sp" android:textStyle="bold" android:minWidth="0dp" android:minHeight="0dp" android:padding="6dp" style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
+            <!-- COLOR: button that opens a radio-choice dialog (like Enhance) -->
+            <Button android:id="@+id/btnWaveletColor" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="COLOR" android:backgroundTint="#FF00FF" android:textColor="#000000" android:textSize="10sp" android:textStyle="bold" android:minWidth="0dp" android:minHeight="0dp" android:padding="6dp" style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
         </LinearLayout>
 
         <com.google.android.material.tabs.TabLayout

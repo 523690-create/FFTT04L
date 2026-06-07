@@ -32,7 +32,7 @@ class WaveletActivity : AppCompatActivity() {
     private lateinit var sliderLevel: Slider
     private lateinit var sliderSampling: Slider
     private lateinit var sliderThreshold: Slider
-    private lateinit var colorSpinner: Spinner
+    private lateinit var btnColor: Button
 
     private lateinit var txtLevelValue: TextView
     private lateinit var txtOrderValue: TextView
@@ -113,7 +113,7 @@ class WaveletActivity : AppCompatActivity() {
         sliderLevel = findViewById(R.id.sliderLevel)
         sliderSampling = findViewById(R.id.sliderSampling)
         sliderThreshold = findViewById(R.id.sliderThreshold)
-        colorSpinner = findViewById(R.id.vColorSpinner)
+        btnColor = findViewById(R.id.btnWaveletColor)
 
         txtLevelValue = findViewById(R.id.txtLevelValue)
         txtOrderValue = findViewById(R.id.txtOrderValue)
@@ -132,7 +132,6 @@ class WaveletActivity : AppCompatActivity() {
 
         waveletView.post {
             updateAllLabelPositions()
-            fitSpinner(colorSpinner)
             filePath?.let { loadAndDecode(File(it)) }
         }
     }
@@ -141,7 +140,6 @@ class WaveletActivity : AppCompatActivity() {
         super.onResume()
         findViewById<View>(android.R.id.content).post {
             updateAllLabelPositions()
-            fitSpinner(colorSpinner)
         }
     }
 
@@ -569,39 +567,58 @@ class WaveletActivity : AppCompatActivity() {
     }
 
     private fun setupColorSpinner() {
-        val colorNames = arrayOf("Default", "Viridis", "Magma", "Gray")
-        val displayNames = colorNames.map { "Color:$it" }
-        val adapter = ArrayAdapter(this, R.layout.spinner_item_gold, displayNames)
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        colorSpinner.adapter = adapter
-        colorSpinner.setSelection(colorSchemeIdx.coerceIn(0, 3))
+        colorSchemeIdx = colorSchemeIdx.coerceIn(0, ColorMaps.count - 1)
         waveletView.setColorScheme(colorSchemeIdx)
-        styleColorSpinner(colorSchemeIdx)
-        colorSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                colorSchemeIdx = position
-                waveletView.setColorScheme(position)
-                prefs.edit { putInt("color_scheme", position) }
-                styleColorSpinner(position)
-            }
-            override fun onNothingSelected(parent: AdapterView<*>?) {}
-        }
+        styleColorButton(colorSchemeIdx)
+        btnColor.setOnClickListener { showColorDialog() }
     }
 
-    /** Match the Listen/FFT COLOR control exactly: caption "COLOR", bg = high color, text = low color
-     *  (was reversed here), and fit the caption like the other top-bar controls. */
-    private fun styleColorSpinner(schemeIdx: Int) {
-        colorSpinner.post {
-            val bg = waveletView.highColorFor(schemeIdx)
-            val fg = waveletView.lowColorFor(schemeIdx)
-            colorSpinner.setBackgroundColor(bg)
-            (colorSpinner.selectedView as? TextView)?.apply {
-                setTextColor(fg)
-                setBackgroundColor(bg)
-                text = "COLOR"
-                setMaxTextSizeToFit("COLOR", maxSizeSp = 12f)
-            }
+    /** Style the COLOR button to reflect the active scheme: background = scheme's high colour,
+     *  text = scheme's low colour (a tiny live preview of the gradient endpoints). */
+    private fun styleColorButton(schemeIdx: Int) {
+        val bg = ColorMaps.highColorFor(schemeIdx)
+        val fg = ColorMaps.lowColorFor(schemeIdx)
+        btnColor.backgroundTintList = android.content.res.ColorStateList.valueOf(bg)
+        btnColor.setTextColor(fg)
+        btnColor.text = "COLOR"
+    }
+
+    /** COLOR picker: a single-choice (radio) dialog, mirroring the Enhance dialog pattern. */
+    private fun showColorDialog() {
+        val density = resources.displayMetrics.density
+        val pad = (16 * density).toInt()
+        val group = RadioGroup(this).apply {
+            orientation = RadioGroup.VERTICAL
+            setPadding(pad, pad / 2, pad, 0)
         }
+        val ids = IntArray(ColorMaps.count)
+        for (i in 0 until ColorMaps.count) {
+            val id = View.generateViewId()
+            ids[i] = id
+            group.addView(RadioButton(this).apply {
+                this.id = id
+                text = ColorMaps.names[i]
+                // Tint each row's text with that scheme's high colour as a quick visual cue.
+                setTextColor(ColorMaps.highColorFor(i))
+                if (i == colorSchemeIdx) isChecked = true
+            })
+        }
+        val scroll = ScrollView(this).apply { addView(group) }
+
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Colour scheme")
+            .setView(scroll)
+            .setPositiveButton("Apply") { _, _ ->
+                val sel = ids.indexOf(group.checkedRadioButtonId)
+                if (sel >= 0) {
+                    colorSchemeIdx = sel
+                    waveletView.setColorScheme(sel)
+                    prefs.edit { putInt("color_scheme", sel) }
+                    styleColorButton(sel)
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun updateOrderSliderRange() {

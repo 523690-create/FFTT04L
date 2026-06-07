@@ -285,7 +285,7 @@ class ViewerActivity : AppCompatActivity() {
     }
 
     private fun setupColorSpinner() {
-        val colorNames = arrayOf("Default", "Viridis", "Magma", "Gray")
+        val colorNames = ColorMaps.names
         val colorDisplayNames = colorNames.map { getString(R.string.color_prefix, it) }
         val colorAdapter = ArrayAdapter(this, R.layout.spinner_item_gold, colorDisplayNames)
         colorAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
