@@ -522,3 +522,28 @@ auto-generates each new checkbox.
 ### Verify on-device
 FFT viewer → DISPLAY → ENHANCE: "Anisotropic" (all devices) and "Gabor ridges" (greyed on
 Nexus 7 / J7, active on CP81 / T65 / Pixel). Colour picker: one tap applies + closes.
+
+### Session 4 update — Frangi shipped
+- **Frangi vesselness** — FFT post-processor (enhance index 11), gated to tier ≥ 1
+  (`heavyEnhanceModes = {10,11}`). Multi-scale (σ 1/2/3) Hessian-eigenvalue vesselness; exact
+  2×2 symmetric eigenvalues; added a separable `gaussianBlur(src, sigma)` helper for scale-space.
+  Greyed "(needs newer device)" on Nexus 7 / J7.
+
+### Roadmap remaining (the hard, lower-value tail)
+- **Ridge skeletonization** (Zhang–Suen thinning): image-op only, 5/10. "Instantaneous-frequency
+  tracking" is a SEPARATE, larger feature (CC linking + path extraction) — don't bundle.
+- **Non-Local Means**: 3/10. Naive NLM is minutes on legacy; needs integral-image optimisation
+  or downscaling, and can smear genuinely-distinct harmonics. Gate to tier 2 only if done.
+- **Higher wavelet orders** (db8/db10, sym8, coif3–5): still deferred pending a TRUSTED
+  coefficient table + a sum-of-squares==1 runtime self-check (transcription errors silently
+  corrupt analysis).
+
+Recommendation: the high-value ridge/denoise enhancements (Anisotropic, Gabor, Frangi) and
+Mexican-Hat CWT are all done. The remaining three are the risky/low-value tail — worth a
+deliberate go/no-go rather than shipping blind.
+
+### Tuning knobs (if on-device review wants adjustment)
+- Gabor: `gain` 1.2, `sigma` 1.8, `lambda` 4.0, 4 orientations (enhGabor).
+- Frangi: `gain` 0.8, scales {1,2,3}, β 0.5 (enhFrangi).
+- Mexican-Hat: shares the CWT scale range (`maxScale = 2^(level+3)`); switch via SETUP→CWT.
+- Anisotropic: `lambda` 0.20, `k` 0.08, 8 iterations (enhAnisotropic).
