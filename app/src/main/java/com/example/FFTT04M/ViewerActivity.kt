@@ -76,13 +76,13 @@ class ViewerActivity : AppCompatActivity() {
     // whichever engine ran (or on the plain STFT when no engine is selected).
     private val enhanceModeNames = arrayOf(
         "Sweep+", "Constant-Q", "Reassignment", "Synchrosqueeze", "Multitaper",
-        "Gaussian", "Bilateral", "TV Denoise", "Butterworth", "Anisotropic", "Gabor ridges"
+        "Gaussian", "Bilateral", "TV Denoise", "Butterworth", "Anisotropic", "Gabor ridges", "Frangi ridges"
     )
     private val enhanceSelected = BooleanArray(enhanceModeNames.size)
     private val engineCount = 5
-    // Post-processors heavy enough to gate off legacy hardware (see DeviceCaps). Index into
-    // enhanceModeNames. Gabor's oriented convolution bank is the first such filter.
-    private val heavyEnhanceModes = setOf(10)
+    // Post-processors heavy enough to gate off legacy hardware (see DeviceCaps). Indices into
+    // enhanceModeNames: Gabor's oriented convolution bank and Frangi's multi-scale Hessian.
+    private val heavyEnhanceModes = setOf(10, 11)
 
     private val refreshLock = Any()
     private var refreshCount = 0
@@ -491,6 +491,7 @@ class ViewerActivity : AppCompatActivity() {
         // Gabor is heavy: only run it where the device tier allows (belt-and-suspenders; the dialog
         // also disables the checkbox on tier 0).
         if (enhanceSelected.getOrElse(10) { false } && DeviceCaps.heavyEnhancementsAllowed(this)) data = enhGabor(data)
+        if (enhanceSelected.getOrElse(11) { false } && DeviceCaps.heavyEnhancementsAllowed(this)) data = enhFrangi(data)
         return data
     }
 
@@ -663,6 +664,93 @@ class ViewerActivity : AppCompatActivity() {
             result[r][c] = history[r][c] + gain * maxResp
         }
         return result
+    }
+
+    /** Separable Gaussian blur at an arbitrary sigma (used by the multi-scale Frangi filter). */
+    private fun gaussianBlur(src: Array<FloatArray>, sigma: Float): Array<FloatArray> {
+        val rows = src.size
+        if (rows == 0) return src
+        val cols = src[0].size
+        val rad = ceil(3f * sigma).toInt().coerceAtLeast(1)
+        val kernel = FloatArray(2 * rad + 1)
+        var ksum = 0f
+        for (i in -rad..rad) { val v = exp(-(i * i) / (2f * sigma * sigma)); kernel[i + rad] = v; ksum += v }
+        for (i in kernel.indices) kernel[i] /= ksum
+        val tmp = Array(rows) { FloatArray(cols) }
+        for (r in 0 until rows) for (c in 0 until cols) {
+            var acc = 0f
+            for (k in -rad..rad) acc += src[r][(c + k).coerceIn(0, cols - 1)] * kernel[k + rad]
+            tmp[r][c] = acc
+        }
+        val out = Array(rows) { FloatArray(cols) }
+        for (r in 0 until rows) for (c in 0 until cols) {
+            var acc = 0f
+            for (k in -rad..rad) acc += tmp[(r + k).coerceIn(0, rows - 1)][c] * kernel[k + rad]
+            out[r][c] = acc
+        }
+        return out
+    }
+
+    /**
+     * Frangi vesselness. At each of several scales the image is Gaussian-smoothed, its 2×2 Hessian
+     * is formed per pixel, and the eigenvalues (|λ1| ≤ |λ2|) feed the Frangi measure
+     * V = exp(-Rb²/2β²)·(1 - exp(-S²/2c²)) for bright ridges (λ2 < 0). The per-pixel MAX over
+     * scales is added back onto the map, highlighting continuous "tubular" spectral ridges while
+     * suppressing blobs/noise. HEAVY (multi-scale Hessian + eigen) — gated to mid+ via DeviceCaps.
+     */
+    private fun enhFrangi(history: Array<FloatArray>): Array<FloatArray> {
+        val rows = history.size
+        if (rows == 0) return history
+        val cols = history[0].size
+        if (cols == 0) return history
+
+        val beta2 = 2f * 0.5f * 0.5f          // 2β², β = 0.5 (standard blobness sensitivity)
+        val gain = 0.8f
+        val scales = floatArrayOf(1.0f, 2.0f, 3.0f)
+        val vessel = Array(rows) { FloatArray(cols) }
+
+        for (sigma in scales) {
+            val sm = gaussianBlur(history, sigma)
+            val s2 = sigma * sigma            // γ-normalisation of the derivatives
+            val lam1 = Array(rows) { FloatArray(cols) }
+            val lam2 = Array(rows) { FloatArray(cols) }
+            var maxS = 1e-6f
+            for (r in 0 until rows) {
+                val rm = if (r > 0) r - 1 else 0
+                val rp = if (r < rows - 1) r + 1 else rows - 1
+                for (c in 0 until cols) {
+                    val cm = if (c > 0) c - 1 else 0
+                    val cp = if (c < cols - 1) c + 1 else cols - 1
+                    val hxx = (sm[r][cp] - 2f * sm[r][c] + sm[r][cm]) * s2
+                    val hyy = (sm[rp][c] - 2f * sm[r][c] + sm[rm][c]) * s2
+                    val hxy = (sm[rp][cp] - sm[rp][cm] - sm[rm][cp] + sm[rm][cm]) * 0.25f * s2
+                    val mean = 0.5f * (hxx + hyy)
+                    val d = sqrt(0.25f * (hxx - hyy) * (hxx - hyy) + hxy * hxy)
+                    var e1 = mean - d
+                    var e2 = mean + d
+                    if (abs(e1) > abs(e2)) { val t = e1; e1 = e2; e2 = t }  // |e1| <= |e2|
+                    lam1[r][c] = e1
+                    lam2[r][c] = e2
+                    val s = sqrt(e1 * e1 + e2 * e2)
+                    if (s > maxS) maxS = s
+                }
+            }
+            val c2 = 2f * (0.5f * maxS) * (0.5f * maxS)   // c = half the max Hessian norm
+            for (r in 0 until rows) for (c in 0 until cols) {
+                val e1 = lam1[r][c]
+                val e2 = lam2[r][c]
+                if (e2 < 0f) {                            // bright ridge on darker background
+                    val rb = e1 / (e2 - 1e-12f)
+                    val s = e1 * e1 + e2 * e2
+                    val v = exp(-(rb * rb) / beta2) * (1f - exp(-s / c2))
+                    if (v > vessel[r][c]) vessel[r][c] = v
+                }
+            }
+        }
+
+        val out = Array(rows) { history[it].copyOf() }
+        for (r in 0 until rows) for (c in 0 until cols) out[r][c] = history[r][c] + gain * vessel[r][c]
+        return out
     }
 
     private fun setupBlurSpinner() {
