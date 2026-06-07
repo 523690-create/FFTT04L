@@ -479,3 +479,46 @@ threshold hides nothing; max safe FS uses full bandwidth.
 Added `mipmap-anydpi-v21/` layer-list icons so API 21–25 devices show the custom icon instead
 of the stock-green fallback (adaptive icons are v26+ only).
 
+
+---
+
+## SESSION 4 (2026-06-07) — Roadmap execution begins (easiest-first, independent)
+
+### Shipped
+- **Colour picker = tap-to-apply.** Removed Apply/Cancel from the shared
+  `showColorSchemeDialog`; tapping a gradient row applies + dismisses immediately, current
+  scheme marked ✓. Affects Listen, FFT, Wavelet (shared dialog).
+- **Anisotropic Diffusion (Perona–Malik)** — FFT-viewer post-processor (enhance index 9).
+  Edge-preserving: smooths along ridges, keeps cross-edges sharp. Formula-based, no tables.
+  Light enough to run on all tiers.
+- **DeviceCaps.kt** — the tier helper from the gating plan is now REAL (tier 0/1/2 by
+  API + RAM, `heavyEnhancementsAllowed()`). Roadmap section above is now implemented, not
+  just proposed.
+- **Gabor ridge bank** — FFT-viewer post-processor (enhance index 10). Zero-mean even Gabor
+  kernels × 4 orientations; per-pixel MAX response boosts oriented "squiggle" energy. HEAVY,
+  so it is **gated**: Enhance dialog disables + annotates it "(needs newer device)" on tier 0
+  (Nexus 7 / J7), and `applyEnhancements` skips it there even with a stale mask bit.
+
+All enhancement post-processors are opt-in (default off), appended at the end of
+`enhanceModeNames` so saved `enhance_mask_v3` values stay valid. The Enhance dialog
+auto-generates each new checkbox.
+
+### Roadmap status now
+- Tier 1 #colour-maps: ✅ (prior session). Higher wavelet orders: NOT done — needs exact
+  published coefficients (db8/db10/sym8/coif3–5); deferred because transcribing 16–30-tap
+  filters from memory risks silently corrupting analysis. Do with a verified table + a
+  sum-of-squares==1 runtime self-check.
+- Tier 2: Anisotropic ✅, Gabor ✅ (gated). Mexican-Hat CWT: still pending — needs a
+  CWT-kernel selector; the family spinner is DWT-coupled, so add a small CWT-only control
+  (a checkbox in SETUP) rather than overloading the family spinner. The CWT engine is already
+  Morlet (`runCwt`, w0=6.0), so Mexican Hat is just an alternate kernel `(sω)²·exp(−(sω)²/2)`.
+- Tier 3 (Frangi, Ridge skeleton, NLM): pending; gate all to tier ≥ 1 (NLM tier 2 only).
+
+### Next easiest-first
+1. Mexican-Hat CWT kernel + a small CWT-wavelet selector (formula-safe, high value for ridges).
+2. Frangi vesselness as a gated post-processor (heaviest-but-one; tier ≥ 1).
+3. Higher wavelet orders once a trusted coefficient table is available.
+
+### Verify on-device
+FFT viewer → DISPLAY → ENHANCE: "Anisotropic" (all devices) and "Gabor ridges" (greyed on
+Nexus 7 / J7, active on CP81 / T65 / Pixel). Colour picker: one tap applies + closes.
