@@ -635,3 +635,12 @@ launch) should be checked on-device.
 Per user: NLM, ridge skeletonization, and instantaneous-frequency tracking are **dropped**
 ("no need for the first 3"). Higher-order wavelets: **done**. Enhancement filters considered
 complete (Anisotropic/Gabor/Frangi cover the space).
+
+### testing notes:
+1. share, send to another device, 6 items in Gallery, app response "no recordings to send"
+2. the label "FFT Gallery" overflows. Put the grid/list switch under the Listen button and shorten to "GALLERY"
+3. top system info bar (time, battery, etc) is hidden. can we make it visible?
+4. in listen, equalizer attenuates recording volume. I want to have it affect only the FFT waterfall display; the recording should be raw mic feed unaffected by equalizer or filter. Audio playback should also be the raw recording.
+5. tell me what you think about this idea: put a "PROCESSED PLAYBACK" button in the DISPLAY tab under the COLOR control; have it look at the data array you used to render the display, run a reverse FFT on it (effectively regenerating an audio file) and play that back. (it may produce unexpected results in reassignment and synchrosqueeze modes but would like to play with taht too.) (no neeed to do that in wavelet right now but tell me if you think that would be workable.)
+6. I think even on smaller screens there is room for another control in DISPLAY tab? I would like to take vertical lines out of BLUR and give them their own control, a multi-pick (like enhancement stack) that includes: 2dp thick vertical lines every second, 1dp lines every 100 msec, and CLEAR if none.
+7. 
