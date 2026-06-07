@@ -43,12 +43,12 @@ class WaveletActivity : AppCompatActivity() {
     private var filePath: String? = null
     private var pcmData: FloatArray? = null
 
-    private var decompositionLevel = 4
-    private var targetFreq = 44100f
+    private var decompositionLevel = 8           // Max level (1-8) for finest detail
+    private var targetFreq = 44100f              // Max safe frequency (44.1 kHz)
     private var originalSampleRate = 44100f
-    private var threshold = 0.01f
+    private var threshold = 0f                   // Zero threshold = off
     private var selectedFamilyIdx = 0
-    private var waveletOrder = 2
+    private var waveletOrder = 10                // Max order (2-10) for finest detail
     private var isSoftThreshold = true
     private var isLogScale = false
     private var isLocalNorm = false
@@ -59,7 +59,7 @@ class WaveletActivity : AppCompatActivity() {
     // boolean flags below are derived from it via syncModeFlags(), so the downstream engine
     // dispatch (which still reads isCWT/isReconstruct/isWPT) is unchanged.
     private val modeNames = arrayOf("DWT", "WPT", "CWT", "RECON")
-    private var analysisMode = 0
+    private var analysisMode = 2                 // Default to CWT (0=DWT, 1=WPT, 2=CWT, 3=RECON)
     private var isWPT = false
     private var isReconstruct = false
     private var isCWT = false
@@ -245,22 +245,24 @@ class WaveletActivity : AppCompatActivity() {
         isLocalNorm = prefs.getBoolean("local_norm", false)
 
         // Single mode selection; migrate from the old independent cwt/wpt/reconstruct booleans.
+        // Default to CWT (mode 2) for best frequency resolution.
         analysisMode = if (prefs.contains("analysis_mode")) {
-            prefs.getInt("analysis_mode", 0)
+            prefs.getInt("analysis_mode", 2)
         } else when {
             prefs.getBoolean("cwt", false) -> 2
             prefs.getBoolean("reconstruct", false) -> 3
             prefs.getBoolean("wpt", false) -> 1
-            else -> 0
+            else -> 2  // Default to CWT instead of DWT
         }
         syncModeFlags()
 
-        decompositionLevel = prefs.getInt("level", 4)
-        waveletOrder = prefs.getInt("order", 2)
+        decompositionLevel = prefs.getInt("level", 8)           // Default to max level (8)
+        waveletOrder = prefs.getInt("order", 10)                // Default to max order (10)
         targetFreq = prefs.getFloat("freq", 44100f)
 
         // Snap the saved threshold onto one of the log slider positions.
-        threshold = thresholdSteps[thresholdToIndex(prefs.getFloat("threshold", 0.01f))]
+        // Default to 0f (off) for clean visualization.
+        threshold = thresholdSteps[thresholdToIndex(prefs.getFloat("threshold", 0f))]
 
         colorSchemeIdx = prefs.getInt("color_scheme", 0)
 

@@ -9,34 +9,47 @@
     <LinearLayout
         android:id="@+id/wCustomToolbar"
         android:layout_width="0dp"
-        android:layout_height="48dp"
+        android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:paddingHorizontal="8dp"
+        android:paddingVertical="4dp"
         android:elevation="8dp"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         android:weightSum="100">
 
+        <!-- COLOR Spinner: render naturally first -->
+        <Spinner
+            android:id="@+id/vColorSpinner"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="40"
+            android:background="@android:color/transparent"
+            android:overlapAnchor="false" />
+
         <Button
             android:id="@+id/btnWaveletGalleryTop"
             android:layout_width="0dp"
-            android:layout_height="40dp"
+            android:layout_height="wrap_content"
             android:layout_weight="30"
             android:text="@string/btn_gallery"
             android:backgroundTint="#FFFF00"
             android:textColor="#000000"
             android:textSize="11sp"
             android:textStyle="bold"
+            android:layout_marginStart="4dp"
             android:layout_marginEnd="4dp"
             android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:padding="8dp"
             style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
 
         <Button
             android:id="@+id/btnWaveletListenTop"
             android:layout_width="0dp"
-            android:layout_height="40dp"
+            android:layout_height="wrap_content"
             android:layout_weight="30"
             android:text="LISTEN"
             android:backgroundTint="#00FFFF"
@@ -45,15 +58,9 @@
             android:textStyle="bold"
             android:layout_marginEnd="4dp"
             android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:padding="8dp"
             style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
-
-        <Spinner
-            android:id="@+id/vColorSpinner"
-            android:layout_width="0dp"
-            android:layout_height="40dp"
-            android:layout_weight="40"
-            android:background="@android:color/transparent"
-            android:overlapAnchor="false" />
     </LinearLayout>
 
     <!-- Display gets a fixed 55% of screen height; the remaining ~45% holds the top bar,
