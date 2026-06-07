@@ -47,20 +47,13 @@
             android:minWidth="0dp"
             style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
 
-        <FrameLayout
+        <Spinner
+            android:id="@+id/vColorSpinner"
             android:layout_width="0dp"
             android:layout_height="40dp"
             android:layout_weight="40"
-            android:gravity="center_vertical">
-            <Spinner
-                android:id="@+id/vColorSpinner"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:padding="4dp"
-                android:gravity="center_vertical"
-                android:layout_gravity="center_vertical"
-                android:overlapAnchor="false" />
-        </FrameLayout>
+            android:background="@android:color/transparent"
+            android:overlapAnchor="false" />
     </LinearLayout>
 
     <!-- Display gets a fixed 55% of screen height; the remaining ~45% holds the top bar,
