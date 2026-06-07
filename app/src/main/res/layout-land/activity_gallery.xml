@@ -33,6 +33,18 @@
             android:visibility="gone" />
 
         <Button
+            android:id="@+id/btnShare"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="SHARE"
+            android:backgroundTint="#90EE90"
+            android:textColor="#000000"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:layout_marginEnd="8dp"
+            style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
+
+        <Button
             android:id="@+id/btnManual"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

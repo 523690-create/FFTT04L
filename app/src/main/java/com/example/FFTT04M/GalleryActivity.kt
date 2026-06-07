@@ -11,8 +11,12 @@ import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
+import java.net.Socket
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -24,6 +28,11 @@ class GalleryActivity : AppCompatActivity() {
     private lateinit var btnViewToggle: ImageButton
     private var isGridView = false
     private var files = mutableListOf<File>()
+
+    // Scanner result (sender side): the scanned handshake string -> connect and stream the bundle.
+    private val scanLauncher = registerForActivityResult(ScanContract()) { result ->
+        result.contents?.let { sendBundleTo(it) }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -52,6 +61,57 @@ class GalleryActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnManual).setOnClickListener {
             startActivity(android.content.Intent(this, ManualActivity::class.java))
         }
+        findViewById<Button>(R.id.btnShare).setOnClickListener { showShareDialog() }
+    }
+
+    /** SHARE → choose Send (scan the other device's QR) or Receive (show this device's QR). */
+    private fun showShareDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("Share gallery")
+            .setItems(arrayOf("Send to another device", "Receive onto this device")) { _, which ->
+                if (which == 0) {
+                    if (GalleryTransfer.recordingWavs(this).isEmpty()) {
+                        Toast.makeText(this, "No recordings to send", Toast.LENGTH_SHORT).show()
+                        return@setItems
+                    }
+                    scanLauncher.launch(ScanOptions().apply {
+                        setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                        setPrompt("Scan the QR shown on the receiving device")
+                        setBeepEnabled(false)
+                        setOrientationLocked(false)
+                    })
+                } else {
+                    startActivity(Intent(this, ImportActivity::class.java))
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    /** Sender: parse the handshake (FFTT1:ip:port:token), connect, and stream the gallery bundle. */
+    private fun sendBundleTo(handshake: String) {
+        val parts = handshake.split(":")
+        if (parts.size != 4 || parts[0] != GalleryTransfer.HANDSHAKE_PREFIX) {
+            Toast.makeText(this, "Not an FFTT transfer code", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val ip = parts[1]
+        val port = parts[2].toIntOrNull() ?: return
+        val token = parts[3]
+        val wavs = GalleryTransfer.recordingWavs(this)
+        Toast.makeText(this, "Sending ${wavs.size} recording(s)…", Toast.LENGTH_SHORT).show()
+        Thread {
+            try {
+                Socket(ip, port).use { sock ->
+                    val out = sock.getOutputStream()
+                    out.write("$token\n".toByteArray())
+                    GalleryTransfer.buildBundle(this, wavs, out)
+                }
+                runOnUiThread { Toast.makeText(this, "Sent ${wavs.size} recording(s)", Toast.LENGTH_LONG).show() }
+            } catch (e: Exception) {
+                runOnUiThread { Toast.makeText(this, "Send failed: ${e.message}", Toast.LENGTH_LONG).show() }
+            }
+        }.start()
     }
 
     override fun onResume() {
