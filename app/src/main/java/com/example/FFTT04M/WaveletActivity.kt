@@ -598,8 +598,20 @@ class WaveletActivity : AppCompatActivity() {
             group.addView(RadioButton(this).apply {
                 this.id = id
                 text = ColorMaps.names[i]
-                // Tint each row's text with that scheme's high colour as a quick visual cue.
-                setTextColor(ColorMaps.highColorFor(i))
+                // Each row's background IS the scheme's gradient (a live preview); white bold
+                // text + black shadow stays legible over any colour map. The radio dot is tinted
+                // white too so it reads against the (usually dark) low end of the gradient.
+                background = schemeSwatch(i)
+                setTextColor(Color.WHITE)
+                setShadowLayer(5f, 0f, 0f, Color.BLACK)
+                setTypeface(typeface, android.graphics.Typeface.BOLD)
+                buttonTintList = android.content.res.ColorStateList.valueOf(Color.WHITE)
+                val vpad = (12 * density).toInt()
+                setPadding(paddingLeft, vpad, (12 * density).toInt(), vpad)
+                layoutParams = RadioGroup.LayoutParams(
+                    RadioGroup.LayoutParams.MATCH_PARENT,
+                    RadioGroup.LayoutParams.WRAP_CONTENT
+                ).apply { bottomMargin = (8 * density).toInt() }
                 if (i == colorSchemeIdx) isChecked = true
             })
         }
@@ -619,6 +631,17 @@ class WaveletActivity : AppCompatActivity() {
             }
             .setNegativeButton("Cancel", null)
             .show()
+    }
+
+    /** A horizontal gradient drawable sampled from a scheme's 256-LUT, used as a row background
+     *  in the colour picker so each option previews its actual colour map. */
+    private fun schemeSwatch(idx: Int): android.graphics.drawable.GradientDrawable {
+        val lut = ColorMaps.lut(idx)
+        val n = 16
+        val colors = IntArray(n) { lut[(it * 255) / (n - 1)] }
+        return android.graphics.drawable.GradientDrawable(
+            android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT, colors
+        ).apply { cornerRadius = 8f }
     }
 
     private fun updateOrderSliderRange() {
