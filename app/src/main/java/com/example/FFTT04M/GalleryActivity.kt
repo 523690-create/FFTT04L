@@ -49,6 +49,9 @@ class GalleryActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnBack).setOnClickListener {
             finish()
         }
+        findViewById<Button>(R.id.btnManual).setOnClickListener {
+            startActivity(android.content.Intent(this, ManualActivity::class.java))
+        }
     }
 
     override fun onResume() {

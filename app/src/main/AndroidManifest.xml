@@ -49,6 +49,12 @@
             android:exported="false"
             android:screenOrientation="fullSensor" />
 
+        <activity
+            android:name=".ManualActivity"
+            android:exported="false"
+            android:label="User Manual"
+            android:screenOrientation="fullSensor" />
+
     </application>
 
 </manifest>
