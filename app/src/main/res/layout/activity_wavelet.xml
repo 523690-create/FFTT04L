@@ -9,8 +9,7 @@
     <LinearLayout
         android:id="@+id/wCustomToolbar"
         android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:minHeight="48dp"
+        android:layout_height="48dp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:paddingHorizontal="8dp"
@@ -48,12 +47,16 @@
             android:minWidth="0dp"
             style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
 
-        <Spinner
-            android:id="@+id/vColorSpinner"
+        <FrameLayout
             android:layout_width="0dp"
             android:layout_height="40dp"
-            android:layout_weight="40"
-            android:overlapAnchor="false" />
+            android:layout_weight="40">
+            <Spinner
+                android:id="@+id/vColorSpinner"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:overlapAnchor="false" />
+        </FrameLayout>
     </LinearLayout>
 
     <!-- Display gets a fixed 55% of screen height; the remaining ~45% holds the top bar,

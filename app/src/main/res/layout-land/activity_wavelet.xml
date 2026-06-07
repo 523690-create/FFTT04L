@@ -37,7 +37,9 @@
             android:weightSum="3">
             <Button android:id="@+id/btnWaveletGalleryTop" android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="1" android:layout_marginEnd="4dp" android:text="@string/btn_gallery" android:backgroundTint="#FFFF00" android:textColor="#000000" android:textSize="10sp" android:textStyle="bold" android:minWidth="0dp" style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
             <Button android:id="@+id/btnWaveletListenTop" android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="1" android:layout_marginEnd="4dp" android:text="LISTEN" android:backgroundTint="#00FFFF" android:textColor="#000000" android:textSize="10sp" android:textStyle="bold" android:minWidth="0dp" style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
-            <Spinner android:id="@+id/vColorSpinner" android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="1" android:overlapAnchor="false" />
+            <FrameLayout android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="1">
+                <Spinner android:id="@+id/vColorSpinner" android:layout_width="match_parent" android:layout_height="match_parent" android:overlapAnchor="false" />
+            </FrameLayout>
         </LinearLayout>
 
         <com.google.android.material.tabs.TabLayout
@@ -115,7 +117,7 @@
             android:layout_height="0dp"
             android:layout_weight="1"
             android:orientation="horizontal"
-            android:weightSum="5"
+            android:weightSum="4"
             android:visibility="gone"
             android:layout_marginTop="2dp">
 
