@@ -5,12 +5,20 @@
 A real-time audio spectrogram and wavelet analysis tool for Android. Listen live, freeze and
 crop interesting moments, save them, and analyse them with FFT or wavelet transforms.
 
-> **This README mirrors the in-app user manual** (`app/src/main/assets/user_manual.md`, shown
-> via **Gallery → HELP**). When one changes, update both.
-
-**Latest debug APK:** the CI builds an APK on every push — grab it from the
-[**Nightly** release](https://github.com/523690-create/FFTT04M/releases/tag/nightly) or from the
+**Latest debug APK:** built on every push — grab it from the
+[**Nightly** release](https://github.com/523690-create/FFTT04M/releases/tag/nightly) or the
 artifacts of the latest [Actions run](https://github.com/523690-create/FFTT04M/actions).
+
+> The manual section below is **auto-synced once a day** from the in-app manual
+> (`app/src/main/assets/user_manual.md`). Edit the manual, not the text between the markers.
+
+<!-- MANUAL:START -->
+# FFTT04M — User Manual
+
+A real-time audio spectrogram and wavelet analysis tool. Listen live, freeze and crop
+interesting moments, save them, and analyse them with FFT or wavelet transforms.
+
+*This manual is bundled with the app and opened from the **HELP** button in the Gallery.*
 
 ---
 
@@ -44,7 +52,7 @@ A grid/list of saved recordings, each with a thumbnail and filename.
 - **Tap** a recording to open it in the **FFT analysis** viewer.
 - The grid/list toggle (top-left) switches layout.
 - **SHARE** sends/receives recordings between devices (see *Sharing*).
-- **HELP** opens the manual. **LISTEN** returns to the live screen.
+- **HELP** opens this manual. **LISTEN** returns to the live screen.
 
 ### FFT analysis (Viewer)
 Detailed FFT spectrogram of a saved recording, with three tabs:
@@ -80,8 +88,6 @@ All settings persist per recording.
 | **WPT** | Wavelet packet transform | Daubechies / Symlet / Coiflet |
 | **CWT** | Continuous wavelet transform (best frequency detail) | Morlet / Mexican Hat |
 | **Reconstruct** | Inverse transform (denoise preview) | Daubechies / Symlet / Coiflet |
-
-Daubechies/Symlet/Coiflet are available in orders db2–db10, sym2–sym8, coif1–coif5.
 
 - **Morlet** — the default CWT wavelet; excellent for tonal, "squiggly" pitch tracks.
 - **Mexican Hat (Ricker)** — a second-derivative shape that isolates ridge peaks and
@@ -130,8 +136,6 @@ comments, and thumbnails** — directly over Wi-Fi, no internet or account neede
 
 The QR code only carries the connection handshake; the audio itself streams over Wi-Fi.
 
----
-
 ## Tips
 
 - If a recording looks empty, check the COLOR scheme and the LOG/L-NORM view toggles.
@@ -141,6 +145,9 @@ The QR code only carries the connection handshake; the audio itself streams over
 
 ---
 
+*Draft manual — updated as features change.*
+<!-- MANUAL:END -->
+
 ## Building
 
 ```
@@ -148,7 +155,3 @@ The QR code only carries the connection handshake; the audio itself streams over
 gradlew.bat :app:assembleDebug    # Windows
 ```
 Requires JDK 17+ (CI uses 21). Min SDK 23, target/compile SDK 36.
-
----
-
-*Manual mirrored from the app — updated as features change.*
