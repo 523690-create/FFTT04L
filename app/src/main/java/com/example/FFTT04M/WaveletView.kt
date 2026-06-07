@@ -104,6 +104,12 @@ class WaveletView @JvmOverloads constructor(
     private val colorSchemes = ColorMaps.luts
     private var activeColors = colorSchemes[0]
 
+    // Cached per-pixel value index (0..255) of the last render, so setColorScheme can recolour with
+    // one LUT lookup per pixel instead of recomputing the whole map from the coefficient arrays.
+    private var valueIndex: IntArray? = null
+    private var viWidth = 0
+    private var viHeight = 0
+
     /** Lowest-value (bottom-of-scale) color of a scheme - used as the COLOR control background. */
     fun lowColorFor(index: Int): Int = colorSchemes[index.coerceIn(0, colorSchemes.size - 1)].first()
 
@@ -146,8 +152,25 @@ class WaveletView @JvmOverloads constructor(
     }
 
     fun setColorScheme(index: Int) {
-        val idx = index.coerceIn(0, colorSchemes.size - 1)
-        activeColors = colorSchemes[idx]
+        activeColors = ColorMaps.lut(index)
+        val vi = valueIndex
+        if (vi != null && viWidth > 0 && viHeight > 0) {
+            // Fast path: re-LUT the cached value buffer; no recompute from coefficients.
+            val pixels = IntArray(vi.size)
+            for (i in vi.indices) pixels[i] = activeColors[vi[i]]
+            val bmp = try {
+                Bitmap.createBitmap(viWidth, viHeight, Bitmap.Config.ARGB_8888)
+            } catch (e: OutOfMemoryError) { null }
+            if (bmp != null) {
+                bmp.setPixels(pixels, 0, viWidth, 0, 0, viWidth, viHeight)
+                val old = waveletBitmap
+                waveletBitmap = bmp
+                old?.recycle()
+                invalidate()
+                return
+            }
+        }
+        // No cached buffer yet (first render not done) — fall back to a full recompute.
         lastResult?.let { updateData(it, false) }
         invalidate()
     }
@@ -220,6 +243,14 @@ class WaveletView @JvmOverloads constructor(
                     System.gc() // Hint for GC
                     return@Thread
                 }
+                // Parallel value buffer for instant recolouring on scheme change.
+                val vidx = try {
+                    IntArray(bmpWidth * bmpHeight)
+                } catch (e: OutOfMemoryError) {
+                    if (updateId == currentUpdateId) isUpdating = false
+                    System.gc()
+                    return@Thread
+                }
                 
                 var globalMax = 1e-9f
                 if (!isLocalNorm) {
@@ -260,7 +291,9 @@ class WaveletView @JvmOverloads constructor(
                             } else {
                                 (rawVal / currentMax).coerceIn(0f, 1f)
                             }
-                            pixels[y * bmpWidth + x] = getColorForValue(normalizedValue)
+                            val ci = valueToIndex(normalizedValue)
+                            pixels[y * bmpWidth + x] = activeColors[ci]
+                            vidx[y * bmpWidth + x] = ci
                         }
                     }
                 } else {
@@ -288,7 +321,9 @@ class WaveletView @JvmOverloads constructor(
                                 } else {
                                     (rawVal / currentMax).coerceIn(0f, 1f)
                                 }
-                                pixels[y * bmpWidth + x] = getColorForValue(normalizedValue)
+                                val ci = valueToIndex(normalizedValue)
+                                pixels[y * bmpWidth + x] = activeColors[ci]
+                                vidx[y * bmpWidth + x] = ci
                             }
                         }
                     }
@@ -309,7 +344,10 @@ class WaveletView @JvmOverloads constructor(
                         val oldBitmap = waveletBitmap
                         waveletBitmap = bitmap
                         oldBitmap?.recycle()
-                        
+                        valueIndex = vidx          // enable fast recolour for this render
+                        viWidth = bmpWidth
+                        viHeight = bmpHeight
+
                         if (!isInterim) {
                             isCalculating = false
                             progress = 0f
@@ -368,18 +406,7 @@ class WaveletView @JvmOverloads constructor(
         }
     }
 
-    private fun getColorForValue(value: Float): Int {
-        val v = value.coerceIn(0f, 1f)
-        val index = (v * (activeColors.size - 1)).toInt()
-        val nextIndex = (index + 1).coerceAtMost(activeColors.size - 1)
-        val fraction = (v * (activeColors.size - 1)) - index
-        return interpolateColor(activeColors[index], activeColors[nextIndex], fraction)
-    }
-
-    private fun interpolateColor(c1: Int, c2: Int, fraction: Float): Int {
-        val r = (Color.red(c1) + (Color.red(c2) - Color.red(c1)) * fraction).toInt()
-        val g = (Color.green(c1) + (Color.green(c2) - Color.green(c1)) * fraction).toInt()
-        val b = (Color.blue(c1) + (Color.blue(c2) - Color.blue(c1)) * fraction).toInt()
-        return Color.rgb(r, g, b)
-    }
+    /** Normalized magnitude (0..1) → LUT index (0..255). Colour is activeColors[idx]. */
+    private fun valueToIndex(value: Float): Int =
+        (value.coerceIn(0f, 1f) * (activeColors.size - 1)).toInt().coerceIn(0, activeColors.size - 1)
 }

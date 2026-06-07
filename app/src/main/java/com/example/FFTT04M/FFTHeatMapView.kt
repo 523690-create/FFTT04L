@@ -31,6 +31,9 @@ class FFTHeatMapView @JvmOverloads constructor(
     private var maxHistory = 129 
     private var currentColumn = 0
     private var spectrogramBitmap: Bitmap? = null
+    // Per-pixel normalized magnitude (0..255; -1 = no data), row-major over the maxHistory-wide
+    // bitmap. Lets setColorScheme recolour with a single LUT lookup per pixel (no reverse search).
+    private var valueIndex: IntArray? = null
     private var yToBinMapping: IntArray? = null
     
     private val minFreq = 80f
@@ -123,57 +126,25 @@ class FFTHeatMapView @JvmOverloads constructor(
     /** Highest-value (top-of-scale) color of a scheme - used as the COLOR control text color. */
     fun highColorFor(index: Int): Int = colorSchemes[index.coerceIn(0, colorSchemes.size - 1)].last()
 
+    /** Recolour instantly from the cached per-pixel value buffer — one LUT lookup per pixel, no
+     *  reverse search, no recompute from source. */
     fun setColorScheme(index: Int) {
-        val idx = index.coerceIn(0, colorSchemes.size - 1)
-        val oldColors = activeColors
-        activeColors = colorSchemes[idx]
-        
-        spectrogramBitmap?.let { bitmap ->
+        activeColors = ColorMaps.lut(index)
+        val bitmap = spectrogramBitmap
+        val vi = valueIndex
+        if (bitmap != null && vi != null) {
             synchronized(bitmap) {
                 val w = bitmap.width
                 val h = bitmap.height
                 val pixels = IntArray(w * h)
-                bitmap.getPixels(pixels, 0, w, 0, 0, w, h)
                 for (i in pixels.indices) {
-                    if (pixels[i] != Color.TRANSPARENT && pixels[i] != Color.BLACK) {
-                        pixels[i] = reMapColor(pixels[i], oldColors, activeColors)
-                    }
+                    val v = vi[i]
+                    pixels[i] = if (v >= 0) activeColors[v] else Color.TRANSPARENT
                 }
                 bitmap.setPixels(pixels, 0, w, 0, 0, w, h)
             }
         }
         invalidate()
-    }
-
-    private fun reMapColor(color: Int, oldPalette: IntArray, newPalette: IntArray): Int {
-        // Find closest value in old palette to estimate original magnitude
-        var bestV = 0f
-        var minDiff = Float.MAX_VALUE
-        for (i in 0..10) {
-            val v = i / 10f
-            val c = getColorFromPalette(v, oldPalette)
-            val diff = colorDiff(color, c)
-            if (diff < minDiff) {
-                minDiff = diff
-                bestV = v
-            }
-        }
-        return getColorFromPalette(bestV, newPalette)
-    }
-
-    private fun colorDiff(c1: Int, c2: Int): Float {
-        val dr = Color.red(c1) - Color.red(c2)
-        val dg = Color.green(c1) - Color.green(c2)
-        val db = Color.blue(c1) - Color.blue(c2)
-        return (dr * dr + dg * dg + db * db).toFloat()
-    }
-
-    private fun getColorFromPalette(v: Float, palette: IntArray): Int {
-        val vv = v.coerceIn(0f, 1f)
-        val index = (vv * (palette.size - 1)).toInt()
-        val nextIndex = (index + 1).coerceAtMost(palette.size - 1)
-        val fraction = (vv * (palette.size - 1)) - index
-        return interpolateColor(palette[index], palette[nextIndex], fraction)
     }
 
     private val gestureDetector = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
@@ -222,6 +193,7 @@ class FFTHeatMapView @JvmOverloads constructor(
     fun clearHistory() {
         currentColumn = 0
         spectrogramBitmap?.eraseColor(Color.TRANSPARENT)
+        valueIndex?.fill(-1)
         invalidate()
     }
 
@@ -229,6 +201,7 @@ class FFTHeatMapView @JvmOverloads constructor(
         if (width > 0 && height > 0) {
             val h = height
             spectrogramBitmap = Bitmap.createBitmap(maxHistory, h, Bitmap.Config.ARGB_8888)
+            valueIndex = IntArray(maxHistory * h) { -1 }
             currentColumn = 0
             precalculateMapping()
         }
@@ -261,38 +234,43 @@ class FFTHeatMapView @JvmOverloads constructor(
         val h = bitmap.height
         
         currentColumn = (currentColumn + 1) % maxHistory
-        
+
         val columnPixels = IntArray(h)
-        
+        val vi = valueIndex
+
         if (data.size == h) {
             // Data is already mapped to the heat map height (e.g. from ViewerActivity background thread)
             for (y in 0 until h) {
-                columnPixels[y] = getColorForValue(data[y])
+                val idx = valueToIndex(data[y])
+                columnPixels[y] = activeColors[idx]
+                vi?.set(y * maxHistory + currentColumn, idx)
             }
         } else {
             // Data is raw frequency bins (e.g. from MainActivity real-time recording)
             val logMin = log10(minFreq)
             val logMax = log10(maxFreq)
             val numBins = data.size
-            
+
             // Vertical interpolation for smoother color mapping
             for (y in 0 until h) {
                 val logF = logMax - (y.toFloat() / h) * (logMax - logMin)
                 val freq = 10.0.pow(logF.toDouble()).toFloat()
                 val binIdxExact = (freq * fftSize / sampleRate)
-                
+
                 val idx1 = binIdxExact.toInt().coerceIn(0, numBins - 1)
                 val idx2 = (idx1 + 1).coerceAtMost(numBins - 1)
                 val frac = binIdxExact - idx1
-                
+
                 val val1 = data[idx1]
                 val val2 = data[idx2]
                 val interpolatedVal = val1 + (val2 - val1) * frac.toFloat()
-                
-                columnPixels[y] = getColorForValue(interpolatedVal)
+
+                val idx = valueToIndex(interpolatedVal)
+                columnPixels[y] = activeColors[idx]
+                vi?.set(y * maxHistory + currentColumn, idx)
             }
         }
-        
+
         synchronized(bitmap) {
             bitmap.setPixels(columnPixels, 0, 1, currentColumn, 0, 1, h)
         }
@@ -451,20 +429,9 @@ class FFTHeatMapView @JvmOverloads constructor(
         return h * (1f - (logF - logMin) / (logMax - logMin))
     }
 
-    private fun getColorForValue(value: Float): Int {
-        val v = value.coerceIn(0f, 1f)
-        val index = (v * (activeColors.size - 1)).toInt()
-        val nextIndex = (index + 1).coerceAtMost(activeColors.size - 1)
-        val fraction = (v * (activeColors.size - 1)) - index
-        return interpolateColor(activeColors[index], activeColors[nextIndex], fraction)
-    }
-
-    private fun interpolateColor(c1: Int, c2: Int, fraction: Float): Int {
-        val r = (Color.red(c1) + (Color.red(c2) - Color.red(c1)) * fraction).toInt()
-        val g = (Color.green(c1) + (Color.green(c2) - Color.green(c1)) * fraction).toInt()
-        val b = (Color.blue(c1) + (Color.blue(c2) - Color.blue(c1)) * fraction).toInt()
-        return Color.rgb(r, g, b)
-    }
+    /** Normalized magnitude (0..1) → LUT index (0..255). The colour is then activeColors[idx]. */
+    private fun valueToIndex(value: Float): Int =
+        (value.coerceIn(0f, 1f) * (activeColors.size - 1)).toInt().coerceIn(0, activeColors.size - 1)
 
     /**
      * Capture the whole heat-map exactly as displayed (current pan/zoom/colors) to a 256x256 PNG.
