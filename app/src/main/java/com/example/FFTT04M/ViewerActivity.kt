@@ -76,7 +76,7 @@ class ViewerActivity : AppCompatActivity() {
     // whichever engine ran (or on the plain STFT when no engine is selected).
     private val enhanceModeNames = arrayOf(
         "Sweep+", "Constant-Q", "Reassignment", "Synchrosqueeze", "Multitaper",
-        "Gaussian", "Bilateral", "TV Denoise", "Butterworth"
+        "Gaussian", "Bilateral", "TV Denoise", "Butterworth", "Anisotropic"
     )
     private val enhanceSelected = BooleanArray(enhanceModeNames.size)
     private val engineCount = 5
@@ -481,6 +481,7 @@ class ViewerActivity : AppCompatActivity() {
         if (enhanceSelected.getOrElse(6) { false }) data = enhBilateral(data)
         if (enhanceSelected.getOrElse(7) { false }) data = enhTvDenoise(data)
         if (enhanceSelected.getOrElse(8) { false }) data = enhButterworth(data)
+        if (enhanceSelected.getOrElse(9) { false }) data = enhAnisotropic(data)
         return data
     }
 
@@ -554,6 +555,43 @@ class ViewerActivity : AppCompatActivity() {
             val prevR = if (r > 0) result[r - 1][c] else history[r][c]
             val prevC = if (c > 0) result[r][c - 1] else history[r][c]
             result[r][c] = history[r][c] * alpha + (prevR + prevC) * (1f - alpha) / 2f
+        }
+        return result
+    }
+
+    /**
+     * Anisotropic diffusion (Perona–Malik). Unlike Gaussian/Butterworth (which blur everything),
+     * the per-pixel conduction `exp(-(∇/K)²)` suppresses smoothing across strong gradients, so it
+     * smooths *along* spectral ridges (the "squiggles") while keeping the edges across them sharp.
+     * Self-contained iterative PDE; runs on whatever grid applyEnhancements receives.
+     */
+    private fun enhAnisotropic(history: Array<FloatArray>): Array<FloatArray> {
+        val rows = history.size
+        if (rows == 0) return history
+        val cols = history[0].size
+        if (cols == 0) return history
+        val result = Array(rows) { history[it].copyOf() }
+        val lambda = 0.20f          // step size; ≤ 0.25 keeps the 4-neighbour scheme stable
+        val k2 = 0.08f * 0.08f      // gradient threshold² (magnitudes are ~0..1 normalised)
+        repeat(8) {
+            val src = Array(rows) { result[it].copyOf() }
+            for (r in 0 until rows) {
+                val up = if (r > 0) r - 1 else 0
+                val dn = if (r < rows - 1) r + 1 else rows - 1
+                for (c in 0 until cols) {
+                    val center = src[r][c]
+                    val gN = src[up][c] - center
+                    val gS = src[dn][c] - center
+                    val gE = src[r][if (c < cols - 1) c + 1 else cols - 1] - center
+                    val gW = src[r][if (c > 0) c - 1 else 0] - center
+                    result[r][c] = center + lambda * (
+                        exp(-(gN * gN) / k2) * gN +
+                        exp(-(gS * gS) / k2) * gS +
+                        exp(-(gE * gE) / k2) * gE +
+                        exp(-(gW * gW) / k2) * gW
+                    )
+                }
+            }
         }
         return result
     }
