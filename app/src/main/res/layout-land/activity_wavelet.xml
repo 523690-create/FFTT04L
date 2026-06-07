@@ -37,8 +37,8 @@
             android:weightSum="3">
             <Button android:id="@+id/btnWaveletGalleryTop" android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="1" android:layout_marginEnd="4dp" android:text="@string/btn_gallery" android:backgroundTint="#FFFF00" android:textColor="#000000" android:textSize="10sp" android:textStyle="bold" android:minWidth="0dp" style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
             <Button android:id="@+id/btnWaveletListenTop" android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="1" android:layout_marginEnd="4dp" android:text="LISTEN" android:backgroundTint="#00FFFF" android:textColor="#000000" android:textSize="10sp" android:textStyle="bold" android:minWidth="0dp" style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
-            <FrameLayout android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="1">
-                <Spinner android:id="@+id/vColorSpinner" android:layout_width="match_parent" android:layout_height="match_parent" android:overlapAnchor="false" />
+            <FrameLayout android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="1" android:gravity="center_vertical">
+                <Spinner android:id="@+id/vColorSpinner" android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="4dp" android:gravity="center_vertical" android:overlapAnchor="false" android:layout_gravity="center_vertical" />
             </FrameLayout>
         </LinearLayout>
 
