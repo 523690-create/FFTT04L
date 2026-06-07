@@ -588,3 +588,50 @@ deliberate go/no-go rather than shipping blind.
 - Wavelet SETUP: MODE on top; switching to/from CWT swaps FAMILY between Morlet/Mexican Hat
   and the DWT families.
 - Gallery → HELP → manual renders and scrolls.
+
+---
+
+## SESSION 6 (2026-06-07) — Higher-order wavelets, versioning, device-to-device transfer
+
+### Versioning
+- App version is now **`2.<yyMMdd.HHmm>`** (build timestamp); `versionCode` = minutes since
+  epoch (monotonic, fits Int). Computed in `app/build.gradle.kts` (needs `import java.util.Locale`).
+  First build: `2.260607.0750`.
+
+### Higher-order wavelets (DONE — were deferred)
+- Added **db8, db10, sym8, coif3, coif4, coif5** to `WaveletActivity.filterMap`.
+- Generated with **PyWavelets 1.8.0** (installed on the dev machine) in the code's `rec_lo`
+  convention, validated: Σh=√2, Σh²=1, double-shift orthogonality ≤1e-13. To regenerate:
+  `python -c "import pywt; print(pywt.Wavelet('db8').rec_lo)"`.
+- `validateFilterBanks()` runtime self-check warns in logcat on any invalid filter.
+- ORDER slider now **snaps to the nearest available order** per family (orders are
+  non-contiguous: db/sym are even-only).
+
+### Device-to-device gallery transfer (NEW — QR + Wi-Fi)
+- **GalleryTransfer**: ZIP "bundle" = per recording `.wav` (+ `.png`/`.txt`) + `<base>.json`
+  of its `rec_` prefs + `manifest.json`. Streams both ways (low-RAM safe). Import de-dupes
+  collisions (`_imp` suffix) across the whole recording incl. prefs namespace. Float/Bool/String
+  keys restored via explicit key-type sets (`FLOAT_KEYS`/`BOOL_KEYS`/`STRING_KEYS`) — **add new
+  non-Int per-recording keys there** or they'll be restored as Int.
+- **ImportActivity** (receiver): TCP `ServerSocket` on the Wi-Fi LAN, shows a QR
+  `FFTT1:ip:port:token`; on connect+token it imports the streamed bundle.
+- **GalleryActivity SHARE** → Send (ZXing scan → connect → stream bundle) or Receive
+  (launch ImportActivity).
+- Dependency: `com.journeyapps:zxing-android-embedded:4.3.0` (pure Java, no Play Services).
+  Permissions: INTERNET + CAMERA (camera `required=false`). ImportActivity registered.
+- **Transport choice (per user): QR-handshake direct, not SAF/Sharesheet.** Requires both
+  devices on the same Wi-Fi LAN. NFC was rejected (bandwidth; Android Beam removed in API 29+;
+  no NFC radio on some fleet devices).
+
+### Manual
+- `user_manual.md` updated with a "Sharing recordings between devices" section + the SHARE button.
+
+### Can't self-test
+The actual transfer needs two devices on one Wi-Fi + a camera scan — that's a user test. I
+verified it builds, installs, and the dependency resolves; UI (SHARE dialog, QR render, scanner
+launch) should be checked on-device.
+
+### Wishlist status
+Per user: NLM, ridge skeletonization, and instantaneous-frequency tracking are **dropped**
+("no need for the first 3"). Higher-order wavelets: **done**. Enhancement filters considered
+complete (Anisotropic/Gabor/Frangi cover the space).
