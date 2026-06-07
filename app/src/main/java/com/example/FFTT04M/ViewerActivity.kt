@@ -76,10 +76,13 @@ class ViewerActivity : AppCompatActivity() {
     // whichever engine ran (or on the plain STFT when no engine is selected).
     private val enhanceModeNames = arrayOf(
         "Sweep+", "Constant-Q", "Reassignment", "Synchrosqueeze", "Multitaper",
-        "Gaussian", "Bilateral", "TV Denoise", "Butterworth", "Anisotropic"
+        "Gaussian", "Bilateral", "TV Denoise", "Butterworth", "Anisotropic", "Gabor ridges"
     )
     private val enhanceSelected = BooleanArray(enhanceModeNames.size)
     private val engineCount = 5
+    // Post-processors heavy enough to gate off legacy hardware (see DeviceCaps). Index into
+    // enhanceModeNames. Gabor's oriented convolution bank is the first such filter.
+    private val heavyEnhanceModes = setOf(10)
 
     private val refreshLock = Any()
     private var refreshCount = 0
@@ -361,10 +364,13 @@ class ViewerActivity : AppCompatActivity() {
         // Post-processors: independent toggles (checkboxes) that stack.
         root.addView(enhanceHeader("Post-processors (stack)"))
         val postBoxes = ArrayList<Pair<Int, CheckBox>>()
+        val heavyBlocked = !DeviceCaps.heavyEnhancementsAllowed(this)
         for (i in engineCount until enhanceModeNames.size) {
-            val cb = CheckBox(this).apply { 
-                text = enhanceModeNames[i]
-                isChecked = enhanceSelected[i]
+            val gatedOff = i in heavyEnhanceModes && heavyBlocked
+            val cb = CheckBox(this).apply {
+                text = enhanceModeNames[i] + if (gatedOff) "  (needs newer device)" else ""
+                isChecked = enhanceSelected[i] && !gatedOff
+                isEnabled = !gatedOff
                 layoutParams = android.widget.LinearLayout.LayoutParams(
                     android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
                     android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
@@ -482,6 +488,9 @@ class ViewerActivity : AppCompatActivity() {
         if (enhanceSelected.getOrElse(7) { false }) data = enhTvDenoise(data)
         if (enhanceSelected.getOrElse(8) { false }) data = enhButterworth(data)
         if (enhanceSelected.getOrElse(9) { false }) data = enhAnisotropic(data)
+        // Gabor is heavy: only run it where the device tier allows (belt-and-suspenders; the dialog
+        // also disables the checkbox on tier 0).
+        if (enhanceSelected.getOrElse(10) { false } && DeviceCaps.heavyEnhancementsAllowed(this)) data = enhGabor(data)
         return data
     }
 
@@ -592,6 +601,66 @@ class ViewerActivity : AppCompatActivity() {
                     )
                 }
             }
+        }
+        return result
+    }
+
+    /**
+     * Gabor ridge bank. A set of zero-mean, even-symmetric Gabor kernels at several orientations
+     * is correlated with the map; the per-pixel MAX response across orientations measures local
+     * ridge strength (oriented line energy). That ridge map is added back onto the original, so
+     * "squiggly" spectral lines are boosted regardless of their slope while flat regions are left
+     * alone. HEAVY (orientations × kernel² per pixel) — gated to mid+ devices via DeviceCaps.
+     */
+    private fun enhGabor(history: Array<FloatArray>): Array<FloatArray> {
+        val rows = history.size
+        if (rows == 0) return history
+        val cols = history[0].size
+        if (cols == 0) return history
+
+        val rad = 4
+        val sigma = 1.8f
+        val lambda = 4.0f
+        val gamma = 0.5f
+        val gain = 1.2f
+        val orientationsDeg = floatArrayOf(0f, 45f, 90f, 135f)
+
+        // Pre-build zero-mean even-Gabor kernels (so flat regions give ~0 response).
+        val kernels = Array(orientationsDeg.size) { oi ->
+            val theta = Math.toRadians(orientationsDeg[oi].toDouble())
+            val cosT = cos(theta).toFloat()
+            val sinT = sin(theta).toFloat()
+            val k = Array(2 * rad + 1) { FloatArray(2 * rad + 1) }
+            var sum = 0f
+            for (y in -rad..rad) for (x in -rad..rad) {
+                val xt = x * cosT + y * sinT
+                val yt = -x * sinT + y * cosT
+                val env = exp(-(xt * xt + gamma * gamma * yt * yt) / (2f * sigma * sigma))
+                val v = env * cos(2.0 * PI * xt / lambda).toFloat()
+                k[y + rad][x + rad] = v
+                sum += v
+            }
+            val mean = sum / ((2 * rad + 1) * (2 * rad + 1))
+            for (yy in k.indices) for (xx in k[yy].indices) k[yy][xx] -= mean
+            k
+        }
+
+        val result = Array(rows) { history[it].copyOf() }
+        for (r in 0 until rows) for (c in 0 until cols) {
+            var maxResp = 0f
+            for (ker in kernels) {
+                var acc = 0f
+                for (y in -rad..rad) {
+                    val rr = (r + y).coerceIn(0, rows - 1)
+                    for (x in -rad..rad) {
+                        val cc = (c + x).coerceIn(0, cols - 1)
+                        acc += history[rr][cc] * ker[y + rad][x + rad]
+                    }
+                }
+                val a = abs(acc)
+                if (a > maxResp) maxResp = a
+            }
+            result[r][c] = history[r][c] + gain * maxResp
         }
         return result
     }
