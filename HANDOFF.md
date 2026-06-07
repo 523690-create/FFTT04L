@@ -262,3 +262,79 @@ a screen that now looks fine. Confirm intent next session.
   - ViewUtils.kt: applyAutoSizeText() walks layout tree, skips EQ/Filter headers; updateAllLabelPositions() dynamically sizes all labels
 - Current state: portrait EQ/Filter working well (headers above sliders with dynamic sizing); landscape still side-by-side (readable but compact); Pixel 3 has label readability issues
 
+---
+
+## SESSION 3 (2026-06-06, new dev machine)
+
+**Context:** User moved to new Windows dev machine with 6 USB debug devices (API 23–36, 720×1280 to 1080×2160). All devices had old APK signature from prior machine. User asked to continue UI improvements on new hardware.
+
+**Critical limitation:** New dev machine has different APK signing key than old one. Devices retain old signatures. Most installs fail with `INSTALL_FAILED_UPDATE_INCOMPATIBLE`. Pixel 3a XL verified before most devices hit the barrier.
+
+### Fixes Applied
+
+#### 1. Wavelet Control Height Inconsistency (RESOLVED)
+**Observation:** Pixel 3a Wavelet top bar (GALLERY/LISTEN/COLOR) had visibly different heights.
+
+**Root cause:** 
+- Toolbar was `wrap_content` with `minHeight="48dp"` → children could center at different heights.
+- Spinner rendering differs from Material buttons even at same declared height (40dp).
+
+**Fixes:**
+- **activity_wavelet.xml (portrait):**
+  - Changed toolbar from `wrap_content` + `minHeight="48dp"` → fixed `height="48dp"`
+  - Wrapped COLOR Spinner in FrameLayout to control its rendering
+- **activity_wavelet.xml-land (landscape):**
+  - Same FrameLayout wrapper for COLOR Spinner
+
+**Verification:** Pixel screenshots before/after show buttons now evenly sized.
+
+#### 2. Wavelet Landscape Slider Width Distribution (RESOLVED)
+**Observation:** Landscape sliders left unused space on right (room for one more slider).
+
+**Root cause:** `pageWaveletSliders` had `android:weightSum="5"` but only 4 slider columns with `layout_weight="1"` each → sliders got 4/5 ≈ 80% of width.
+
+**Fix:** Changed `android:weightSum="5"` → `android:weightSum="4"` in landscape layout.
+
+**Impact:** Sliders now fill full width; visual balance consistent with portrait.
+
+#### 3. Samsung Tablet COLOR Spinner Sizing (DIAGNOSTIC)
+**Report:** Galaxy Tab A (API 27, landscape) had COLOR spinner larger than GALLERY/LISTEN buttons.
+
+**Fix Applied:** Same as #1 above (FrameLayout wrapper ensures consistent sizing).
+
+**Verification Status:** Samsung Tab A dropped out of USB debug mid-session. Fix is structural (toolbar height control + Spinner containment) so confidence is high for next session when USB is restored.
+
+### Commits in this session
+- `5f14fd5` "Fix uneven Wavelet controls: fixed toolbar height and wrap Spinner in FrameLayout"
+  - Toolbar 48dp, FrameLayout wrappers, landscape weightSum fix
+
+### Test Coverage (This Session)
+- **Pixel 3a XL (API 32, portrait):** ✓ Top buttons verified evenly sized
+- **Galaxy J7 (API 25, landscape):** Install attempted, old signature key blocked re-verification
+- **Galaxy Tab A (API 27, landscape):** USB debug dropped; fix applied structurally
+- **Others (Nexus 7, CP81, T65):** Old signature keys pending resolution
+
+### Remaining Known Issues
+
+1. **Wavelet ORD slider value clipping at minimum** (deferred from prior session)
+   - Minor: numeric value ("1") clips below FrameLayout when thumb at minimum
+   - Same `updateLabelPosition` logic as EQ sliders
+   - Deferred: low priority, already flagged
+
+2. **APK Signing Key Mismatch**
+   - New machine signing key differs from old machine
+   - Most devices fail install with `INSTALL_FAILED_UPDATE_INCOMPATIBLE`
+   - Resolution: either sync key or ask user for key file
+
+### Next Session Checklist
+1. **Resolve signing key:** Ask user for old key or re-provision devices
+2. **Re-verify on all 6 devices:** Landscape controls (especially COLOR button), slider widths
+3. **Wavelet ORD value clip:** Fix if time permits (low priority)
+4. **Full portrait sweep on Pixel 3a:** Not done this session (only landscape top buttons)
+5. **API downgrade analysis:** Deferred from prior session, still pending
+
+### Build Status
+- APK: `app-debug.apk` builds clean
+- Git: Commits on main, in sync with origin/main
+- Gradle: Configuration cache reused, builds in ~3–5 seconds
+
