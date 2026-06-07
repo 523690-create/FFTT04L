@@ -152,8 +152,7 @@ class MainActivity : AppCompatActivity() {
             setupColorSpinner()
         } else {
             noiseFilterStrength = prefs.getFloat("noise_filter_strength", 0f)
-            val savedColorScheme = prefs.getInt("color_scheme", 0)
-            fftHeatMap.setColorScheme(savedColorScheme)
+            fftHeatMap.setColorScheme(ColorMaps.loadGlobal(this))
             scaleLandscapeControls()
         }
 
@@ -386,13 +385,13 @@ class MainActivity : AppCompatActivity() {
         val button = btnColor ?: return
         if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) return
 
-        val savedColorScheme = prefs.getInt("color_scheme", 0).coerceIn(0, ColorMaps.count - 1)
+        val savedColorScheme = ColorMaps.loadGlobal(this)
         fftHeatMap.setColorScheme(savedColorScheme)
         styleColorButton(savedColorScheme)
         button.setOnClickListener {
-            showColorSchemeDialog(prefs.getInt("color_scheme", 0)) { sel ->
+            showColorSchemeDialog(ColorMaps.loadGlobal(this)) { sel ->
                 fftHeatMap.setColorScheme(sel)
-                prefs.edit { putInt("color_scheme", sel) }
+                ColorMaps.saveGlobal(this, sel)
                 styleColorButton(sel)
             }
         }

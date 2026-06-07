@@ -64,18 +64,18 @@
             android:layout_weight="1"
             android:orientation="vertical">
 
-            <!-- Each spinner on its own full-width row so the long descriptions fit (mirrors portrait) -->
+            <!-- MODE first; FAMILY repopulates with mode-relevant choices; then BND (mirrors portrait) -->
             <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginBottom="2dp">
-                <TextView android:layout_width="64dp" android:layout_height="wrap_content" android:text="FAM" android:textColor="#FFFF00" android:textSize="12sp" android:textStyle="bold"/>
+                <TextView android:layout_width="64dp" android:layout_height="wrap_content" android:text="MODE" android:textColor="#FFFF00" android:textSize="12sp" android:textStyle="bold"/>
+                <Spinner android:id="@+id/waveletModeSpinner" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:backgroundTint="#FFFFFF" android:layout_marginStart="4dp" />
+            </LinearLayout>
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginBottom="2dp">
+                <TextView android:layout_width="64dp" android:layout_height="wrap_content" android:text="FAMILY" android:textColor="#FFFF00" android:textSize="12sp" android:textStyle="bold"/>
                 <Spinner android:id="@+id/waveletFamilySpinner" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:backgroundTint="#FFFFFF" android:layout_marginStart="4dp" />
             </LinearLayout>
             <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginBottom="2dp">
                 <TextView android:layout_width="64dp" android:layout_height="wrap_content" android:text="BND" android:textColor="#FFFF00" android:textSize="12sp" android:textStyle="bold"/>
                 <Spinner android:id="@+id/waveletBoundarySpinner" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:backgroundTint="#FFFFFF" android:layout_marginStart="4dp" />
-            </LinearLayout>
-            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginBottom="2dp">
-                <TextView android:layout_width="64dp" android:layout_height="wrap_content" android:text="MODE" android:textColor="#FFFF00" android:textSize="12sp" android:textStyle="bold"/>
-                <Spinner android:id="@+id/waveletModeSpinner" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:backgroundTint="#FFFFFF" android:layout_marginStart="4dp" />
             </LinearLayout>
 
             <!-- Legacy status (GONE): shown inline next to SOFT instead -->
@@ -107,12 +107,6 @@
                 <TextView android:layout_width="64dp" android:layout_height="wrap_content" android:text="View" android:textColor="#AAAAAA" android:textSize="11sp" android:textStyle="bold" android:maxLines="1"/>
                 <CheckBox android:id="@+id/checkLogScale" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="LOG" android:textColor="#FFFFFF" android:buttonTint="#FFFFFF" android:textSize="11sp" android:maxLines="1" android:layout_marginEnd="8dp" />
                 <CheckBox android:id="@+id/checkLocalNorm" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="L-NORM" android:textColor="#FFFFFF" android:buttonTint="#FFFFFF" android:textSize="11sp" android:maxLines="1" />
-            </LinearLayout>
-
-            <!-- CWT mother wavelet (only affects CWT mode): Morlet (default) vs Mexican Hat -->
-            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="2dp">
-                <TextView android:layout_width="64dp" android:layout_height="wrap_content" android:text="CWT" android:textColor="#AAAAAA" android:textSize="11sp" android:textStyle="bold" android:maxLines="1"/>
-                <Spinner android:id="@+id/cwtWaveletSpinner" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:backgroundTint="#FFFFFF" android:layout_marginStart="4dp" />
             </LinearLayout>
         </LinearLayout>
 

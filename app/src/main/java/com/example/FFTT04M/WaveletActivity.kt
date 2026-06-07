@@ -28,7 +28,6 @@ class WaveletActivity : AppCompatActivity() {
     private lateinit var checkLog: CheckBox
     private lateinit var checkLocalNorm: CheckBox
     private lateinit var modeSpinner: Spinner
-    private lateinit var cwtWaveletSpinner: Spinner
     private lateinit var sliderOrder: Slider
     private lateinit var sliderLevel: Slider
     private lateinit var sliderSampling: Slider
@@ -111,7 +110,6 @@ class WaveletActivity : AppCompatActivity() {
         checkLog = findViewById(R.id.checkLogScale)
         checkLocalNorm = findViewById(R.id.checkLocalNorm)
         modeSpinner = findViewById(R.id.waveletModeSpinner)
-        cwtWaveletSpinner = findViewById(R.id.cwtWaveletSpinner)
         sliderOrder = findViewById(R.id.sliderOrder)
         sliderLevel = findViewById(R.id.sliderLevel)
         sliderSampling = findViewById(R.id.sliderSampling)
@@ -265,7 +263,7 @@ class WaveletActivity : AppCompatActivity() {
         // Default to 0f (off) for clean visualization.
         threshold = thresholdSteps[thresholdToIndex(prefs.getFloat("threshold", 0f))]
 
-        colorSchemeIdx = prefs.getInt("color_scheme", 0)
+        colorSchemeIdx = ColorMaps.loadForRecording(this, prefs)
         cwtWaveletIdx = prefs.getInt("cwt_wavelet", 0)
 
         updateUIFromSettings()
@@ -387,7 +385,7 @@ class WaveletActivity : AppCompatActivity() {
     }
 
     private fun updateUIFromSettings() {
-        familySpinner.setSelection(selectedFamilyIdx)
+        if (familySpinner.adapter != null) refreshFamilySpinner()  // mode-aware; skip pre-setup
         boundarySpinner.setSelection(selectedBoundaryIdx)
         modeSpinner.setSelection(analysisMode)
         checkSoft.isChecked = isSoftThreshold
@@ -439,18 +437,23 @@ class WaveletActivity : AppCompatActivity() {
     }
 
     private fun setupControls() {
-        // Full descriptive names now that each spinner has its own full-width row.
-        val families = arrayOf("Daubechies", "Symlet", "Coiflet")
-        val familyAdapter = ArrayAdapter(this, R.layout.spinner_item, families)
-        familyAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        familySpinner.adapter = familyAdapter
+        // FAMILY is mode-aware: in CWT it lists mother wavelets (Morlet / Mexican Hat); otherwise
+        // the DWT filter families. The listener writes whichever selection the current mode owns.
         familySpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(p0: AdapterView<*>?, p1: View?, pos: Int, p3: Long) {
-                if (selectedFamilyIdx != pos) {
-                    selectedFamilyIdx = pos
-                    prefs.edit().putInt("family", pos).apply()
-                    updateOrderSliderRange()
-                    runDwt()
+                if (isCWT) {
+                    if (cwtWaveletIdx != pos) {
+                        cwtWaveletIdx = pos
+                        prefs.edit { putInt("cwt_wavelet", pos) }
+                        runDwt()
+                    }
+                } else {
+                    if (selectedFamilyIdx != pos) {
+                        selectedFamilyIdx = pos
+                        prefs.edit().putInt("family", pos).apply()
+                        updateOrderSliderRange()
+                        runDwt()
+                    }
                 }
             }
             override fun onNothingSelected(p0: AdapterView<*>?) {}
@@ -487,6 +490,7 @@ class WaveletActivity : AppCompatActivity() {
                     waveletView.setWPT(isWPT)
                     waveletView.setCwtMode(isCWT)
                     prefs.edit { putInt("analysis_mode", pos) }
+                    refreshFamilySpinner()   // swap FAMILY choices to match the new mode
                     updateSafetyStatus()
                     runDwt()
                 }
@@ -494,22 +498,8 @@ class WaveletActivity : AppCompatActivity() {
             override fun onNothingSelected(p0: AdapterView<*>?) {}
         }
 
-        // CWT mother wavelet: Morlet (default) vs Mexican Hat (Ricker). Only affects CWT mode.
-        val cwtWavelets = arrayOf("Morlet", "Mexican Hat")
-        val cwtAdapter = ArrayAdapter(this, R.layout.spinner_item, cwtWavelets)
-        cwtAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        cwtWaveletSpinner.adapter = cwtAdapter
-        cwtWaveletSpinner.setSelection(cwtWaveletIdx.coerceIn(0, cwtWavelets.size - 1))
-        cwtWaveletSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(p0: AdapterView<*>?, p1: View?, pos: Int, p3: Long) {
-                if (cwtWaveletIdx != pos) {
-                    cwtWaveletIdx = pos
-                    prefs.edit { putInt("cwt_wavelet", pos) }
-                    if (isCWT) runDwt()   // only a CWT-mode re-run matters
-                }
-            }
-            override fun onNothingSelected(p0: AdapterView<*>?) {}
-        }
+        // Populate FAMILY for the initial mode (after the mode spinner is wired).
+        refreshFamilySpinner()
 
         checkSoft.setOnCheckedChangeListener { _, isChecked ->
             isSoftThreshold = isChecked
@@ -609,9 +599,21 @@ class WaveletActivity : AppCompatActivity() {
         showColorSchemeDialog(colorSchemeIdx) { sel ->
             colorSchemeIdx = sel
             waveletView.setColorScheme(sel)
-            prefs.edit { putInt("color_scheme", sel) }
+            ColorMaps.saveForRecording(this, prefs, sel)
             styleColorButton(sel)
         }
+    }
+
+    /** Populate the mode-aware FAMILY spinner: CWT mother wavelets in CWT mode, DWT filter families
+     *  otherwise. Selecting the current value is guarded in the listener, so no spurious re-run. */
+    private fun refreshFamilySpinner() {
+        val items = if (isCWT) arrayOf("Morlet", "Mexican Hat")
+                    else arrayOf("Daubechies", "Symlet", "Coiflet")
+        val adapter = ArrayAdapter(this, R.layout.spinner_item, items)
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        familySpinner.adapter = adapter
+        val sel = (if (isCWT) cwtWaveletIdx else selectedFamilyIdx).coerceIn(0, items.size - 1)
+        familySpinner.setSelection(sel)
     }
 
     private fun updateOrderSliderRange() {

@@ -287,13 +287,13 @@ class ViewerActivity : AppCompatActivity() {
     }
 
     private fun setupColorSpinner() {
-        val savedColorScheme = prefs.getInt("color_scheme", 0).coerceIn(0, ColorMaps.count - 1)
+        val savedColorScheme = ColorMaps.loadForRecording(this, prefs)
         viewerFft.setColorScheme(savedColorScheme)
         styleColorButton(savedColorScheme)
         btnColor.setOnClickListener {
-            showColorSchemeDialog(prefs.getInt("color_scheme", 0)) { sel ->
+            showColorSchemeDialog(ColorMaps.loadForRecording(this, prefs)) { sel ->
                 viewerFft.setColorScheme(sel)
-                prefs.edit { putInt("color_scheme", sel) }
+                ColorMaps.saveForRecording(this, prefs, sel)
                 styleColorButton(sel)
             }
         }
