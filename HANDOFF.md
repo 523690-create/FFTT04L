@@ -338,3 +338,144 @@ a screen that now looks fine. Confirm intent next session.
 - Git: Commits on main, in sync with origin/main
 - Gradle: Configuration cache reused, builds in ~3–5 seconds
 
+---
+
+## FEATURE ROADMAP (assessed 2026-06-06, grounded in the actual codebase)
+
+Realism ratings reflect *this* codebase, not generic difficulty. Read the "already exists"
+notes carefully — two requested features are partly built already.
+
+### Architecture facts that drive these estimates
+- **Colour maps are now centralised** in `ColorMaps.kt` (256-entry LUTs, append-only index
+  order, shared by `FFTHeatMapView` + `WaveletView`). Adding a scheme = add one anchor-stop
+  array; every call site (spinners, Wavelet COLOR dialog, control theming) picks it up via
+  `ColorMaps.names` / `.count` / `.lut()`. **DONE this session.**
+- **The CWT engine is already a complex Morlet.** `WaveletActivity.runCwt()` convolves in the
+  frequency domain with `exp(-0.5·(scale·ω − w0)²)`, `w0 = 6.0`, separate Re/Im buffers,
+  100 scales, FFT-based, off-UI-thread with progress + stop. A second Morlet (Constant-Q)
+  lives in `ViewerActivity` (~line 1167). So "Complex Morlet for pitch tracking" = expose the
+  existing engine, optionally make `w0`/cycles tunable.
+- **DWT filter banks** live in `WaveletActivity.filterMap` (Daubechies db2/4/6, Symlets
+  sym2/4/6, Coiflets coif1/2). Higher orders = pure published-coefficient data entry.
+- **The Enhance dialog** (`ViewerActivity.showEnhanceDialog`) is the proven pattern for
+  one-exclusive-engine + stacked-post-processors. New enhancement filters slot in as either a
+  radio engine or a checkbox post-processor; `applyEnhancements()` is the single hook.
+
+### Tier 1 — trivial, do anytime (data/wiring only)
+1. **Higher wavelet orders** (db8/db10, sym8, coif3–5): add coefficient arrays to `filterMap`.
+   `updateOrderSliderRange()` already adapts the ORDER slider to the family's available keys,
+   so the UI auto-expands. ~½ day, no new algorithms. **Realism 10/10.**
+2. **Label the existing Morlet** as a selectable CWT family; optionally add a "cycles" (`w0`)
+   control. ~½ day. **Realism 9/10.**
+
+### Tier 2 — easy-moderate (one new kernel/function each)
+3. **Mexican Hat (Ricker) CWT**: same `runCwt` loop, swap kernel to `ω²·exp(−ω²/2)`. Inherits
+   the 60k cap, threading, progress, stop. ~1 day. **Realism 8/10.**
+4. **Anisotropic Diffusion (Perona–Malik)** as the first new enhancement: iterative,
+   edge-preserving; TV-Denoise already ships (same family) so there's reusable plumbing.
+   ~1–2 days. **Realism 8/10.** Best ratio of payoff to risk among the "squiggle" filters.
+5. **Gabor filter bank** (oriented ridge enhancement): N oriented 2D convolutions, combined.
+   Bounded cost. ~2 days. **Realism 6/10.**
+
+### Tier 3 — moderate-hard (correctness + performance risk)
+6. **Frangi vesselness** (multi-scale Hessian eigen-analysis): genuinely suits spectral
+   ridges, but heaviest-but-one and fiddly to tune. ~3–4 days. **Realism 5/10.**
+7. **Ridge skeletonization**: thinning (Zhang–Suen) is moderate (~2 days). NOTE: "track
+   instantaneous frequency" is a SEPARATE, larger feature (connected-component linking +
+   path extraction) — do not bundle it into the checkbox. **Realism 5/10 (image op) / 3/10
+   (full tracking).**
+8. **Non-Local Means denoising**: naive NLM is minutes on a Nexus 7. Needs integral-image
+   optimisation or downscaling; can smear genuinely-distinct harmonics. Lowest priority.
+   **Realism 3/10.**
+
+### Cross-cutting prerequisite for Tier 2–3
+Decide the grid the enhancement filters run on. The full CWT coefficient buffer is up to
+**100 scales × 60k samples ≈ 6M cells** — too slow on the two oldest devices. Run filters on
+the **display-resolution** grid (what's actually drawn), or downsample first. This single
+decision determines whether these are usable on legacy hardware.
+
+### Optional one-time polish
+- The 256-LUT anchors approximate matplotlib. For exact CVD fidelity (Cividis's whole point),
+  paste the full 256-sample table into `ColorMaps.anchors` later — no call sites change.
+
+---
+
+## LEGACY-DEVICE GATING STRATEGY (how to hide high-demand features on old hardware)
+
+Test fleet spans **API 23 → 36** and **720×1280 → 1080×2160**, including a Nexus 7 (2012) and
+Galaxy J7. Several roadmap items are too heavy for the oldest devices. Recommended approach:
+
+### 1. Reuse the existing capability cutoff
+There is already a precedent: the WAVELET button is hidden below API 26 in `ViewerActivity`
+(`R.id.btnViewerWavelet → View.GONE when SDK_INT < O`). Generalise this rather than scatter
+new `if` checks.
+
+### 2. Add a single `DeviceTier` helper (recommended)
+Create `DeviceCaps.kt`:
+```kotlin
+object DeviceCaps {
+    // Tier by a blend of API level and RAM; cache once.
+    fun tier(ctx: Context): Int {
+        val mem = (ctx.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager)
+            .let { ActivityManager.MemoryInfo().apply { it.getMemoryInfo(this) } }
+        val lowRam = mem.totalMem < 2L * 1024 * 1024 * 1024   // < 2 GB
+        return when {
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.O || lowRam -> 0  // legacy
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.S -> 1            // mid
+            else -> 2                                                     // modern
+        }
+    }
+    val heavyEnhancementsAllowed get() = { c: Context -> tier(c) >= 1 }
+    val cwtAllowed              get() = { c: Context -> tier(c) >= 1 }
+}
+```
+
+### 3. Gate at three levels (cheapest → most graceful)
+- **Hide the control** (current WAVELET pattern): set the radio row / checkbox / button to
+  `GONE` on tier 0. Simplest; the user never sees the heavy option. Good for NLM, Frangi.
+- **Disable + annotate**: keep the row visible but `isEnabled = false` with a "(needs newer
+  device)" suffix, so users understand the feature exists. Better UX than silent hiding.
+- **Auto-degrade the parameters**: keep the feature but cap cost on tier 0 — e.g. fewer CWT
+  scales (50 not 100), fewer diffusion iterations, run on a downsampled grid, lower max
+  decomposition level. This is what `applyFailsafe()` / the 60k CWT cap already do; extend the
+  same idea per-feature.
+
+### 4. Concrete gating recommendations per roadmap item
+| Feature | Tier 0 (legacy) | Tier 1 (mid) | Tier 2 (modern) |
+|---|---|---|---|
+| New colour maps | ✅ all (cheap LUT) | ✅ | ✅ |
+| Higher wavelet orders | ✅ | ✅ | ✅ |
+| Mexican Hat / Morlet CWT | ⚠ degrade: 50 scales | ✅ | ✅ |
+| Anisotropic Diffusion | ⚠ fewer iters + downsampled grid | ✅ | ✅ |
+| Gabor bank | ❌ hide | ✅ | ✅ |
+| Frangi vesselness | ❌ hide | ⚠ downsampled | ✅ |
+| Ridge skeleton / tracking | ❌ hide | ⚠ | ✅ |
+| Non-Local Means | ❌ hide | ⚠ downsampled | ✅ |
+
+### 5. Always log silent caps
+If a feature silently degrades on a device (fewer scales, downsampled grid), surface it — a
+small Toast or a "(eased)" suffix on the control — so behaviour differences across the fleet
+aren't mistaken for bugs. The current `updateSafetyStatus()` "⚠ … will auto-ease" text is the
+right precedent to follow.
+
+---
+
+## SESSION 3 cont. — Colour overhaul + Wavelet defaults (2026-06-06)
+
+### Wavelet analysis defaults (per-recording)
+New recordings default to: **CWT, level 8, order 10, threshold 0 (off), 44.1 kHz**. Stored in
+the per-recording `rec_<name>` prefs namespace (shared with the FFT Viewer), so user overrides
+persist per recording. Rationale: CWT + max level/order gives the richest detail; zero
+threshold hides nothing; max safe FS uses full bandwidth.
+
+### Colour system (see FEATURE ROADMAP for details)
+- `ColorMaps.kt`: 8 schemes as 256-entry LUTs (Default/Viridis/Magma/Gray + Inferno/Plasma/
+  Turbo/Cividis). Append-only indices keep old `color_scheme` prefs valid.
+- Both heat-map views share it; duplicate palette arrays removed.
+- Wavelet COLOR is now a **button → radio dialog** (Enhance-style), not a spinner — fixes the
+  long-running spinner-sizing problem on Pixel/T65/CP81 by eliminating the Spinner entirely.
+
+### Launcher icon
+Added `mipmap-anydpi-v21/` layer-list icons so API 21–25 devices show the custom icon instead
+of the stock-green fallback (adaptive icons are v26+ only).
+
