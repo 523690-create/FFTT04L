@@ -1,5 +1,6 @@
 import java.text.SimpleDateFormat
 import java.util.Date
+import java.util.Locale
 
 plugins {
     alias(libs.plugins.android.application)
@@ -13,8 +14,10 @@ android {
         applicationId = "com.example.FFTT04M"
         minSdk = 23
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        // Versioning starts at major 2 with a build timestamp: "2.<yyMMdd.HHmm>".
+        // versionCode = whole minutes since the Unix epoch (monotonic, fits Int until ~2065).
+        versionCode = (System.currentTimeMillis() / 60000L).toInt()
+        versionName = "2.${SimpleDateFormat("yyMMdd.HHmm", Locale.US).format(Date())}"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

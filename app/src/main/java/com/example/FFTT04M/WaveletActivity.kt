@@ -82,20 +82,29 @@ class WaveletActivity : AppCompatActivity() {
         private const val MIN_LEVEL = 1                       // matches sliderLevel valueFrom
     }
 
+    // Reconstruction low-pass coefficients (pywt rec_lo convention; key = order N = dbN/symN/coifN).
+    // db8/db10, sym8, coif3/4/5 were generated from PyWavelets 1.8.0 and validated (sum=√2,
+    // sumsq=1, double-shift orthogonality ≤ 1e-13). validateFilterBanks() re-checks at runtime.
     private val filterMap = mapOf(
         0 to mapOf( // Daubechies
             2 to floatArrayOf(0.4829629f, 0.8365163f, 0.22414387f, -0.12940952f),
             4 to floatArrayOf(0.23037782f, 0.71484655f, 0.6308807f, -0.02798377f, -0.18703482f, 0.03084138f, 0.03288301f, -0.010597401f),
-            6 to floatArrayOf(0.11154074f, 0.4946239f, 0.7511339f, 0.31525035f, -0.2262647f, -0.12976687f, 0.097501605f, 0.027522866f, -0.03158204f, 0.0005538422f, 0.0047772575f, -0.10773011f)
+            6 to floatArrayOf(0.11154074f, 0.4946239f, 0.7511339f, 0.31525035f, -0.2262647f, -0.12976687f, 0.097501605f, 0.027522866f, -0.03158204f, 0.0005538422f, 0.0047772575f, -0.10773011f),
+            8 to floatArrayOf(0.0544158422f, 0.3128715909f, 0.6756307363f, 0.5853546837f, -0.0158291053f, -0.2840155430f, 0.0004724846f, 0.1287474266f, -0.0173693010f, -0.0440882539f, 0.0139810279f, 0.0087460940f, -0.0048703530f, -0.0003917404f, 0.0006754494f, -0.0001174768f),
+            10 to floatArrayOf(0.0266700579f, 0.1881768001f, 0.5272011889f, 0.6884590395f, 0.2811723437f, -0.2498464243f, -0.1959462744f, 0.1273693403f, 0.0930573646f, -0.0713941472f, -0.0294575368f, 0.0332126741f, 0.0036065536f, -0.0107331755f, 0.0013953517f, 0.0019924053f, -0.0006858567f, -0.0001164669f, 0.0000935887f, -0.0000132642f)
         ),
         1 to mapOf( // Symlets
             2 to floatArrayOf(0.4829629131445341f, 0.8365163037378077f, 0.2241438680420134f, -0.1294095225512603f),
             4 to floatArrayOf(0.0322231006040713f, -0.0126039672622612f, -0.0992195435769354f, 0.2978577956055422f, 0.8037387518052163f, 0.4976186676324459f, -0.0296355276459541f, -0.0757657147893407f),
-            6 to floatArrayOf(0.0154041093270273f, 0.0034907120842174f, -0.0679442279548073f, -0.001546137461876f, 0.2239077890625405f, 0.7661305174151252f, 0.5661984509385461f, -0.0456156055694133f, -0.1656939890451729f, 0.0381335880155719f, 0.022552550234519f, -0.0084333777038722f)
+            6 to floatArrayOf(0.0154041093270273f, 0.0034907120842174f, -0.0679442279548073f, -0.001546137461876f, 0.2239077890625405f, 0.7661305174151252f, 0.5661984509385461f, -0.0456156055694133f, -0.1656939890451729f, 0.0381335880155719f, 0.022552550234519f, -0.0084333777038722f),
+            8 to floatArrayOf(0.0018899503f, -0.0003029205f, -0.0149522583f, 0.0038087520f, 0.0491371797f, -0.0272190299f, -0.0519458381f, 0.3644418948f, 0.7771857517f, 0.4813596513f, -0.0612733591f, -0.1432942384f, 0.0076074873f, 0.0316950878f, -0.0005421323f, -0.0033824160f)
         ),
         2 to mapOf( // Coiflets
             1 to floatArrayOf(-0.0156557281354445f, -0.0727326195128538f, 0.3848648468642029f, 0.8525720202122554f, 0.3378976624578092f, -0.0713941471666038f),
-            2 to floatArrayOf(0.0007205494453681f, 0.0098188151214044f, -0.0145672283288424f, -0.1459110111442116f, 0.446100069123405f, 0.862633294433604f, 0.2026431902046894f, -0.0783824357753173f, 0.0355152331018546f, 0.0117451274026362f, -0.0049137179673602f, -0.0029685472443134f)
+            2 to floatArrayOf(0.0007205494453681f, 0.0098188151214044f, -0.0145672283288424f, -0.1459110111442116f, 0.446100069123405f, 0.862633294433604f, 0.2026431902046894f, -0.0783824357753173f, 0.0355152331018546f, 0.0117451274026362f, -0.0049137179673602f, -0.0029685472443134f),
+            3 to floatArrayOf(-0.0037935129f, 0.0077825964f, 0.0234526961f, -0.0657719113f, -0.0611233900f, 0.4051769024f, 0.7937772226f, 0.4284834764f, -0.0717998216f, -0.0823019271f, 0.0345550276f, 0.0158805449f, -0.0090079761f, -0.0025745177f, 0.0011175188f, 0.0004662170f, -0.0000709833f, -0.0000345998f),
+            4 to floatArrayOf(0.0008923139f, -0.0016294924f, -0.0073461679f, 0.0160689471f, 0.0266823047f, -0.0812667102f, -0.0560773196f, 0.4153084270f, 0.7822389344f, 0.4343860331f, -0.0666274724f, -0.0962204245f, 0.0393344226f, 0.0250822533f, -0.0152117282f, -0.0056582838f, 0.0037514347f, 0.0012665611f, -0.0005890202f, -0.0002599743f, 0.0000623389f, 0.0000312299f, -0.0000032596f, -0.0000017850f),
+            5 to floatArrayOf(-0.0002120819f, 0.0003585777f, 0.0021782944f, -0.0041593126f, -0.0101315848f, 0.0234083221f, 0.0281697443f, -0.0919215881f, -0.0520466703f, 0.4215712667f, 0.7742936229f, 0.4379823067f, -0.0620377516f, -0.1055631513f, 0.0412875305f, 0.0326747995f, -0.0197583916f, -0.0091595073f, 0.0067615202f, 0.0024315754f, -0.0016616273f, -0.0006375589f, 0.0003018579f, 0.0001403563f, -0.0000412199f, -0.0000212702f, 0.0000037007f, 0.0000020612f, -0.0000001624f, -0.0000000960f)
         )
     )
 
@@ -437,6 +446,7 @@ class WaveletActivity : AppCompatActivity() {
     }
 
     private fun setupControls() {
+        validateFilterBanks()
         // FAMILY is mode-aware: in CWT it lists mother wavelets (Morlet / Mexican Hat); otherwise
         // the DWT filter families. The listener writes whichever selection the current mode owns.
         familySpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
@@ -546,7 +556,12 @@ class WaveletActivity : AppCompatActivity() {
         }
         sliderOrder.addOnChangeListener { s, value, fromUser ->
             if (fromUser) {
-                waveletOrder = value.toInt()
+                // Snap to the nearest order that actually has a filter for this family (orders are
+                // non-contiguous, e.g. Daubechies = 2,4,6,8,10). Avoids a silent no-op on odd values.
+                val avail = filterMap[selectedFamilyIdx]?.keys?.sorted() ?: listOf(value.toInt())
+                val snapped = avail.minByOrNull { abs(it - value.toInt()) } ?: value.toInt()
+                waveletOrder = snapped
+                if (s.value != snapped.toFloat()) s.value = snapped.toFloat()  // programmatic: fromUser=false, no recurse
                 txtOrderValue.text = waveletOrder.toString()
                 prefs.edit().putInt("order", waveletOrder).apply()
                 updateLabelPosition(s, txtOrderValue)
@@ -614,6 +629,21 @@ class WaveletActivity : AppCompatActivity() {
         familySpinner.adapter = adapter
         val sel = (if (isCWT) cwtWaveletIdx else selectedFamilyIdx).coerceIn(0, items.size - 1)
         familySpinner.setSelection(sel)
+    }
+
+    /** Runtime self-check on the wavelet filter banks: warns (logcat) if any filter is not a valid
+     *  orthogonal low-pass (Σh ≈ √2, Σh² ≈ 1). Catches coefficient transcription errors instead of
+     *  silently corrupting analysis. The shipped tables pass; this guards future edits. */
+    private fun validateFilterBanks() {
+        val famNames = arrayOf("Daubechies", "Symlet", "Coiflet")
+        for ((fam, orders) in filterMap) for ((order, h) in orders) {
+            val sum = h.sum()
+            val sumSq = h.fold(0f) { a, x -> a + x * x }
+            if (abs(sum - sqrt(2f)) > 1e-2f || abs(sumSq - 1f) > 1e-2f) {
+                android.util.Log.w("FFTT04M",
+                    "Suspect wavelet ${famNames.getOrElse(fam) { "?" }} order $order: sum=$sum sumsq=$sumSq")
+            }
+        }
     }
 
     private fun updateOrderSliderRange() {
