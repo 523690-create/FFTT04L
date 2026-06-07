@@ -547,3 +547,44 @@ deliberate go/no-go rather than shipping blind.
 - Frangi: `gain` 0.8, scales {1,2,3}, β 0.5 (enhFrangi).
 - Mexican-Hat: shares the CWT scale range (`maxScale = 2^(level+3)`); switch via SETUP→CWT.
 - Anisotropic: `lambda` 0.20, `k` 0.08, 8 iterations (enhAnisotropic).
+
+---
+
+## SESSION 5 (2026-06-07) — Colour reorg, persistence, Wavelet FAMILY merge, user manual
+
+### Colour
+- **Turbo is the new default**; the old crude 7-colour "Default/Heat" map (a rough Turbo)
+  was removed. New order: 0 Turbo 1 Viridis 2 Magma 3 Inferno 4 Plasma 5 Cividis 6 Gray.
+- One-time **v1→v2 index migration** in ColorMaps keeps saved `color_scheme` prefs valid
+  (`REMAP_V1_TO_V2`, gated by `color_scheme_ver`).
+- **Persistence centralised** in ColorMaps:
+  - `loadGlobal/saveGlobal` → Listen (app_settings, across sessions).
+  - `loadForRecording/saveForRecording` → analysis (per-recording, falls back to global on
+    first open, and also writes global so the choice carries across screens).
+  All three screens now call these instead of reading `color_scheme` directly.
+
+### Wavelet SETUP
+- Row order is now **MODE, FAMILY, BND** (was FAM, BND, MODE).
+- **FAMILY is mode-aware** (`refreshFamilySpinner`): CWT → Morlet/Mexican Hat; DWT/WPT/RECON
+  → Daubechies/Symlet/Coiflet. The separate CWT-wavelet spinner was removed/merged. Label is
+  the full word "FAMILY". `updateUIFromSettings` routes through the helper so failsafe resets
+  stay mode-correct.
+
+### User manual
+- `app/src/main/assets/user_manual.md` — draft manual (all screens, modes, colours,
+  enhancements). Bundled in the APK AND visible in the repo. **Keep it updated with features.**
+- `ManualActivity` renders it (lightweight Markdown→HTML: headings, bold/italic, bullets,
+  rules, simple tables) in a scrollable dark TextView. Registered in the manifest.
+- **Gallery → HELP** button (portrait + landscape) opens it.
+
+### Gotcha fixed during this session
+- A `*/` inside a KDoc comment ("load*/save*") prematurely closed the block comment in
+  ColorMaps.kt → cascade of "Expecting a top level declaration". Avoid literal `*/` in
+  comments.
+
+### Verify on-device
+- Colour: default recordings/Listen now show **Turbo**. Pick a scheme in Listen → open a new
+  recording → it inherits that scheme; each recording then remembers its own.
+- Wavelet SETUP: MODE on top; switching to/from CWT swaps FAMILY between Morlet/Mexican Hat
+  and the DWT families.
+- Gallery → HELP → manual renders and scrolls.
