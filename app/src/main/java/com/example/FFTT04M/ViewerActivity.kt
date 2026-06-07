@@ -40,7 +40,7 @@ class ViewerActivity : AppCompatActivity() {
     private lateinit var viewerFft: FFTHeatMapView
     private lateinit var sizeSpinner: Spinner
     private lateinit var stepSpinner: Spinner
-    private lateinit var colorSpinner: Spinner
+    private lateinit var btnColor: Button
     private lateinit var blurSpinner: Spinner
     private lateinit var btnSweep: Button
     private var viewerProgress: android.widget.ProgressBar? = null
@@ -205,7 +205,7 @@ class ViewerActivity : AppCompatActivity() {
     private fun setupControls() {
         sizeSpinner = findViewById(R.id.vSizeSpinner)
         stepSpinner = findViewById(R.id.vStepSpinner)
-        colorSpinner = findViewById(R.id.vColorSpinner)
+        btnColor = findViewById(R.id.btnViewerColor)
         blurSpinner = findViewById(R.id.vBlurSpinner)
         // enhanceSpinner is redundant (hidden in layout); logic moved to Enhance button.
         btnSweep = findViewById(R.id.btnViewerSweep)
@@ -252,7 +252,6 @@ class ViewerActivity : AppCompatActivity() {
             fitSpinner(sizeSpinner)
             fitSpinner(stepSpinner)
             fitSpinner(blurSpinner)
-            fitSpinner(colorSpinner)
         }
     }
 
@@ -285,38 +284,23 @@ class ViewerActivity : AppCompatActivity() {
     }
 
     private fun setupColorSpinner() {
-        val colorNames = ColorMaps.names
-        val colorDisplayNames = colorNames.map { getString(R.string.color_prefix, it) }
-        val colorAdapter = ArrayAdapter(this, R.layout.spinner_item_gold, colorDisplayNames)
-        colorAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        colorSpinner.adapter = colorAdapter
-        val savedColorScheme = prefs.getInt("color_scheme", 0)
-        colorSpinner.setSelection(savedColorScheme)
+        val savedColorScheme = prefs.getInt("color_scheme", 0).coerceIn(0, ColorMaps.count - 1)
         viewerFft.setColorScheme(savedColorScheme)
-        styleColorSpinner(savedColorScheme)
-
-        colorSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(p0: AdapterView<*>?, p1: android.view.View?, pos: Int, p3: Long) {
-                viewerFft.setColorScheme(pos)
-                prefs.edit { putInt("color_scheme", pos) }
-                styleColorSpinner(pos)
+        styleColorButton(savedColorScheme)
+        btnColor.setOnClickListener {
+            showColorSchemeDialog(prefs.getInt("color_scheme", 0)) { sel ->
+                viewerFft.setColorScheme(sel)
+                prefs.edit { putInt("color_scheme", sel) }
+                styleColorButton(sel)
             }
-            override fun onNothingSelected(p0: AdapterView<*>?) {}
         }
     }
 
-    /** Borrowed COLOR-control appearance (from FFTT02M): caption "COLOR", text=low-value color, bg=high-value color (REVERSED). */
-    private fun styleColorSpinner(schemeIdx: Int) {
-        colorSpinner.post {
-            val bg = viewerFft.highColorFor(schemeIdx)
-            val fg = viewerFft.lowColorFor(schemeIdx)
-            colorSpinner.setBackgroundColor(bg)
-            (colorSpinner.selectedView as? android.widget.TextView)?.apply {
-                setTextColor(fg)
-                setBackgroundColor(bg)
-                setMaxTextSizeToFit("COLOR", maxSizeSp = 12f)
-            }
-        }
+    /** Style the COLOR button to preview the active scheme (bg = high colour, text = low colour). */
+    private fun styleColorButton(idx: Int) {
+        btnColor.text = "COLOR"
+        btnColor.backgroundTintList = android.content.res.ColorStateList.valueOf(viewerFft.highColorFor(idx))
+        btnColor.setTextColor(viewerFft.lowColorFor(idx))
     }
 
 

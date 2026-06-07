@@ -166,7 +166,7 @@
 
         <!-- Use standard FrameLayout wrapper to ensure visibility="gone" works with custom widgets if needed -->
         <Spinner android:id="@+id/micSpinner" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
-        <Spinner android:id="@+id/colorSpinner" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
+        <Button android:id="@+id/btnColor" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
         <com.google.android.material.slider.Slider android:id="@+id/sliderNoiseFilter" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" android:valueFrom="0.0" android:valueTo="1.0" android:value="0.0"/>
         <com.google.android.material.slider.Slider android:id="@+id/sliderNoiseRise" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" android:valueFrom="0.0" android:valueTo="3.0" android:value="0.0"/>
         <com.google.android.material.slider.Slider android:id="@+id/sliderNoiseFall" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" android:valueFrom="0.0" android:valueTo="3.0" android:value="0.0"/>

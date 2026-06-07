@@ -583,65 +583,14 @@ class WaveletActivity : AppCompatActivity() {
         btnColor.text = "COLOR"
     }
 
-    /** COLOR picker: a single-choice (radio) dialog, mirroring the Enhance dialog pattern. */
+    /** COLOR picker: the shared gradient-swatch radio dialog (same on Listen, FFT, Wavelet). */
     private fun showColorDialog() {
-        val density = resources.displayMetrics.density
-        val pad = (16 * density).toInt()
-        val group = RadioGroup(this).apply {
-            orientation = RadioGroup.VERTICAL
-            setPadding(pad, pad / 2, pad, 0)
+        showColorSchemeDialog(colorSchemeIdx) { sel ->
+            colorSchemeIdx = sel
+            waveletView.setColorScheme(sel)
+            prefs.edit { putInt("color_scheme", sel) }
+            styleColorButton(sel)
         }
-        val ids = IntArray(ColorMaps.count)
-        for (i in 0 until ColorMaps.count) {
-            val id = View.generateViewId()
-            ids[i] = id
-            group.addView(RadioButton(this).apply {
-                this.id = id
-                text = ColorMaps.names[i]
-                // Each row's background IS the scheme's gradient (a live preview); white bold
-                // text + black shadow stays legible over any colour map. The radio dot is tinted
-                // white too so it reads against the (usually dark) low end of the gradient.
-                background = schemeSwatch(i)
-                setTextColor(Color.WHITE)
-                setShadowLayer(5f, 0f, 0f, Color.BLACK)
-                setTypeface(typeface, android.graphics.Typeface.BOLD)
-                buttonTintList = android.content.res.ColorStateList.valueOf(Color.WHITE)
-                val vpad = (12 * density).toInt()
-                setPadding(paddingLeft, vpad, (12 * density).toInt(), vpad)
-                layoutParams = RadioGroup.LayoutParams(
-                    RadioGroup.LayoutParams.MATCH_PARENT,
-                    RadioGroup.LayoutParams.WRAP_CONTENT
-                ).apply { bottomMargin = (8 * density).toInt() }
-                if (i == colorSchemeIdx) isChecked = true
-            })
-        }
-        val scroll = ScrollView(this).apply { addView(group) }
-
-        androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle("Colour scheme")
-            .setView(scroll)
-            .setPositiveButton("Apply") { _, _ ->
-                val sel = ids.indexOf(group.checkedRadioButtonId)
-                if (sel >= 0) {
-                    colorSchemeIdx = sel
-                    waveletView.setColorScheme(sel)
-                    prefs.edit { putInt("color_scheme", sel) }
-                    styleColorButton(sel)
-                }
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
-    }
-
-    /** A horizontal gradient drawable sampled from a scheme's 256-LUT, used as a row background
-     *  in the colour picker so each option previews its actual colour map. */
-    private fun schemeSwatch(idx: Int): android.graphics.drawable.GradientDrawable {
-        val lut = ColorMaps.lut(idx)
-        val n = 16
-        val colors = IntArray(n) { lut[(it * 255) / (n - 1)] }
-        return android.graphics.drawable.GradientDrawable(
-            android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT, colors
-        ).apply { cornerRadius = 8f }
     }
 
     private fun updateOrderSliderRange() {

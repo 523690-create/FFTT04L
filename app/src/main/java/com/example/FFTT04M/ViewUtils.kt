@@ -295,3 +295,61 @@ fun updateValueBarLabel(slider: Slider, label: TextView?, barColor: Int) {
     label.elevation = 6f * density
     fitBarValueText(label, label.layoutParams.width)
 }
+
+// ---------------------------------------------------------------------------------------------
+// Shared colour-scheme picker (gradient-swatch radio dialog) used by Listen, FFT, and Wavelet.
+// ---------------------------------------------------------------------------------------------
+
+/** A horizontal gradient drawable sampled from a scheme's 256-LUT — used as a row background in
+ *  the colour picker (and reusable elsewhere) so each option previews its actual colour map. */
+fun colorSchemeSwatch(idx: Int): android.graphics.drawable.GradientDrawable {
+    val lut = ColorMaps.lut(idx)
+    val n = 16
+    val colors = IntArray(n) { lut[(it * 255) / (n - 1)] }
+    return android.graphics.drawable.GradientDrawable(
+        android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT, colors
+    ).apply { cornerRadius = 8f }
+}
+
+/** Single-choice colour-scheme dialog shared by all three screens. Each row's background IS that
+ *  scheme's gradient (a live preview); white bold text + black shadow stays legible over any map.
+ *  Calls [onPick] with the chosen index when the user taps Apply. */
+fun android.content.Context.showColorSchemeDialog(currentIdx: Int, onPick: (Int) -> Unit) {
+    val density = resources.displayMetrics.density
+    val group = android.widget.RadioGroup(this).apply {
+        orientation = android.widget.RadioGroup.VERTICAL
+        val p = (16 * density).toInt()
+        setPadding(p, p / 2, p, 0)
+    }
+    val ids = IntArray(ColorMaps.count)
+    for (i in 0 until ColorMaps.count) {
+        val id = View.generateViewId()
+        ids[i] = id
+        group.addView(android.widget.RadioButton(this).apply {
+            this.id = id
+            text = ColorMaps.names[i]
+            background = colorSchemeSwatch(i)
+            setTextColor(Color.WHITE)
+            setShadowLayer(5f, 0f, 0f, Color.BLACK)
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            buttonTintList = ColorStateList.valueOf(Color.WHITE)
+            val vpad = (12 * density).toInt()
+            setPadding(paddingLeft, vpad, (12 * density).toInt(), vpad)
+            layoutParams = android.widget.RadioGroup.LayoutParams(
+                android.widget.RadioGroup.LayoutParams.MATCH_PARENT,
+                android.widget.RadioGroup.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = (8 * density).toInt() }
+            if (i == currentIdx) isChecked = true
+        })
+    }
+    val scroll = android.widget.ScrollView(this).apply { addView(group) }
+    androidx.appcompat.app.AlertDialog.Builder(this)
+        .setTitle("Colour scheme")
+        .setView(scroll)
+        .setPositiveButton("Apply") { _, _ ->
+            val sel = ids.indexOf(group.checkedRadioButtonId)
+            if (sel >= 0) onPick(sel)
+        }
+        .setNegativeButton("Cancel", null)
+        .show()
+}
