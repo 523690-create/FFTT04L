@@ -28,6 +28,7 @@ class WaveletActivity : AppCompatActivity() {
     private lateinit var checkLog: CheckBox
     private lateinit var checkLocalNorm: CheckBox
     private lateinit var modeSpinner: Spinner
+    private lateinit var cwtWaveletSpinner: Spinner
     private lateinit var sliderOrder: Slider
     private lateinit var sliderLevel: Slider
     private lateinit var sliderSampling: Slider
@@ -54,6 +55,7 @@ class WaveletActivity : AppCompatActivity() {
     private var isLocalNorm = false
     private var selectedBoundaryIdx = 0
     private var colorSchemeIdx = 0
+    private var cwtWaveletIdx = 0                 // 0 = Morlet (default), 1 = Mexican Hat (Ricker)
 
     // Analysis mode is a single exclusive choice (was three independent checkboxes). The legacy
     // boolean flags below are derived from it via syncModeFlags(), so the downstream engine
@@ -109,6 +111,7 @@ class WaveletActivity : AppCompatActivity() {
         checkLog = findViewById(R.id.checkLogScale)
         checkLocalNorm = findViewById(R.id.checkLocalNorm)
         modeSpinner = findViewById(R.id.waveletModeSpinner)
+        cwtWaveletSpinner = findViewById(R.id.cwtWaveletSpinner)
         sliderOrder = findViewById(R.id.sliderOrder)
         sliderLevel = findViewById(R.id.sliderLevel)
         sliderSampling = findViewById(R.id.sliderSampling)
@@ -263,6 +266,7 @@ class WaveletActivity : AppCompatActivity() {
         threshold = thresholdSteps[thresholdToIndex(prefs.getFloat("threshold", 0f))]
 
         colorSchemeIdx = prefs.getInt("color_scheme", 0)
+        cwtWaveletIdx = prefs.getInt("cwt_wavelet", 0)
 
         updateUIFromSettings()
     }
@@ -485,6 +489,23 @@ class WaveletActivity : AppCompatActivity() {
                     prefs.edit { putInt("analysis_mode", pos) }
                     updateSafetyStatus()
                     runDwt()
+                }
+            }
+            override fun onNothingSelected(p0: AdapterView<*>?) {}
+        }
+
+        // CWT mother wavelet: Morlet (default) vs Mexican Hat (Ricker). Only affects CWT mode.
+        val cwtWavelets = arrayOf("Morlet", "Mexican Hat")
+        val cwtAdapter = ArrayAdapter(this, R.layout.spinner_item, cwtWavelets)
+        cwtAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        cwtWaveletSpinner.adapter = cwtAdapter
+        cwtWaveletSpinner.setSelection(cwtWaveletIdx.coerceIn(0, cwtWavelets.size - 1))
+        cwtWaveletSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(p0: AdapterView<*>?, p1: View?, pos: Int, p3: Long) {
+                if (cwtWaveletIdx != pos) {
+                    cwtWaveletIdx = pos
+                    prefs.edit { putInt("cwt_wavelet", pos) }
+                    if (isCWT) runDwt()   // only a CWT-mode re-run matters
                 }
             }
             override fun onNothingSelected(p0: AdapterView<*>?) {}
@@ -880,18 +901,26 @@ class WaveletActivity : AppCompatActivity() {
                 val scale = minScale * (maxScale / minScale).pow(s.toFloat() / (numScales - 1))
                 
                 val w0 = 6.0f
+                val sqrtScale = sqrt(scale)
+                val isMexican = cwtWaveletIdx == 1
                 for (i in 0 until paddedSize) {
                     val omega = if (i <= paddedSize / 2) {
                         (2f * PI.toFloat() * i) / paddedSize
                     } else {
                         (2f * PI.toFloat() * (i - paddedSize)) / paddedSize
                     }
-                    
-                    val valExp = -0.5f * (scale * omega - w0).pow(2)
-                    if (valExp > -20f) {
-                        wavRe[i] = exp(valExp) * sqrt(scale)
+
+                    if (isMexican) {
+                        // Mexican Hat (Ricker): frequency response ∝ (sω)²·exp(−(sω)²/2).
+                        // Real & symmetric, so the imaginary part is zero (like the Morlet branch).
+                        val sw = scale * omega
+                        val sw2 = sw * sw
+                        val valExp = -0.5f * sw2
+                        wavRe[i] = if (valExp > -20f) sw2 * exp(valExp) * sqrtScale else 0f
                     } else {
-                        wavRe[i] = 0f
+                        // Morlet (default).
+                        val valExp = -0.5f * (scale * omega - w0).pow(2)
+                        wavRe[i] = if (valExp > -20f) exp(valExp) * sqrtScale else 0f
                     }
                     wavIm[i] = 0f
                 }
