@@ -192,11 +192,22 @@ class GalleryActivity : AppCompatActivity() {
         Toast.makeText(this, "Receiving…", Toast.LENGTH_SHORT).show()
         thread {
             try {
-                Socket(ip, port).use { sock ->
+                Socket().use { sock ->
+                    // Fail fast (8s) instead of hanging; the usual cause is router AP/client
+                    // isolation blocking device-to-device traffic even on the same Wi-Fi.
+                    sock.connect(java.net.InetSocketAddress(ip, port), 8000)
                     sock.getOutputStream().apply { write("$token\n".toByteArray()); flush() }
                     val res = GalleryTransfer.importBundle(this, sock.getInputStream())
                     runOnUiThread { reportImport(res) }
                 }
+            } catch (e: java.net.SocketTimeoutException) {
+                runOnUiThread { Toast.makeText(this,
+                    "Couldn't reach the other device. This Wi-Fi may block device-to-device (AP isolation) — try a phone hotspot, or use Export/Import to file.",
+                    Toast.LENGTH_LONG).show() }
+            } catch (e: java.net.ConnectException) {
+                runOnUiThread { Toast.makeText(this,
+                    "Connection refused. Make sure the other device still shows its QR, and that the Wi-Fi allows device-to-device.",
+                    Toast.LENGTH_LONG).show() }
             } catch (e: Throwable) {
                 runOnUiThread { Toast.makeText(this, "Receive failed: ${e.message}", Toast.LENGTH_LONG).show() }
             }
