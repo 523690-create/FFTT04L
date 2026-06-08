@@ -14,6 +14,8 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.FileProvider
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import java.net.Socket
@@ -33,6 +35,25 @@ class GalleryActivity : AppCompatActivity() {
     // Scanner result (receiver side): scanned the donor's QR -> connect and pull the bundle.
     private val scanLauncher = registerForActivityResult(ScanContract()) { result ->
         result.contents?.let { receiveBundleFrom(it) }
+    }
+
+    // Import a .fftt bundle file picked from anywhere (Files, Drive, a download, etc.).
+    private val importFileLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri ?: return@registerForActivityResult
+        Toast.makeText(this, "Importing…", Toast.LENGTH_SHORT).show()
+        thread {
+            try {
+                val count = contentResolver.openInputStream(uri)?.use {
+                    GalleryTransfer.importBundle(this, it)
+                } ?: 0
+                runOnUiThread {
+                    Toast.makeText(this, "Imported $count recording(s)", Toast.LENGTH_LONG).show()
+                    loadFiles()
+                }
+            } catch (e: Throwable) {
+                runOnUiThread { Toast.makeText(this, "Import failed: ${e.message}", Toast.LENGTH_LONG).show() }
+            }
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -65,28 +86,67 @@ class GalleryActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnShare).setOnClickListener { showShareDialog() }
     }
 
-    /** SHARE → Send (show this device's QR; it streams its gallery) or Receive (scan the donor's QR). */
+    /** SHARE → QR transfer (same Wi-Fi) or file transfer (any network, via the OS share sheet). */
     private fun showShareDialog() {
+        val options = arrayOf(
+            "Send via QR (same Wi-Fi)",
+            "Receive via QR (same Wi-Fi)",
+            "Export / share to file…",
+            "Import from file…"
+        )
         AlertDialog.Builder(this)
             .setTitle("Share gallery")
-            .setItems(arrayOf("Send to another device", "Receive onto this device")) { _, which ->
-                if (which == 0) {
-                    if (GalleryTransfer.recordingWavs(this).isEmpty()) {
-                        Toast.makeText(this, "No recordings to send", Toast.LENGTH_SHORT).show()
-                        return@setItems
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> {
+                        if (GalleryTransfer.recordingWavs(this).isEmpty()) {
+                            Toast.makeText(this, "No recordings to send", Toast.LENGTH_SHORT).show()
+                        } else {
+                            startActivity(Intent(this, ExportActivity::class.java))   // QR, streams on connect
+                        }
                     }
-                    startActivity(Intent(this, ExportActivity::class.java))   // shows QR, streams on connect
-                } else {
-                    scanLauncher.launch(ScanOptions().apply {
+                    1 -> scanLauncher.launch(ScanOptions().apply {
                         setDesiredBarcodeFormats(ScanOptions.QR_CODE)
                         setPrompt("Scan the QR shown on the SENDING device")
                         setBeepEnabled(false)
                         setOrientationLocked(false)
                     })
+                    2 -> exportToFile()
+                    3 -> importFileLauncher.launch("*/*")
                 }
             }
             .setNegativeButton("Cancel", null)
             .show()
+    }
+
+    /** Build a .fftt bundle and hand it to the system share sheet (Quick Share / Bluetooth / email /
+     *  Drive / …) — works across any network, unlike the same-Wi-Fi QR path. */
+    private fun exportToFile() {
+        val wavs = GalleryTransfer.recordingWavs(this)
+        if (wavs.isEmpty()) {
+            Toast.makeText(this, "No recordings to send", Toast.LENGTH_SHORT).show()
+            return
+        }
+        Toast.makeText(this, "Building bundle…", Toast.LENGTH_SHORT).show()
+        thread {
+            try {
+                val dir = File(cacheDir, "share").apply { mkdirs() }
+                dir.listFiles()?.forEach { it.delete() }   // keep only the latest
+                val f = File(dir, "FFTT_gallery_${System.currentTimeMillis()}.fftt")
+                f.outputStream().use { GalleryTransfer.buildBundle(this, wavs, it) }
+                val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", f)
+                runOnUiThread {
+                    val send = Intent(Intent.ACTION_SEND).apply {
+                        type = "application/zip"
+                        putExtra(Intent.EXTRA_STREAM, uri)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    startActivity(Intent.createChooser(send, "Share gallery (${wavs.size} recordings)"))
+                }
+            } catch (e: Throwable) {
+                runOnUiThread { Toast.makeText(this, "Export failed: ${e.message}", Toast.LENGTH_LONG).show() }
+            }
+        }
     }
 
     /** Receiver: parse the donor's handshake (FFTT1:ip:port:token), connect, send the token, and
