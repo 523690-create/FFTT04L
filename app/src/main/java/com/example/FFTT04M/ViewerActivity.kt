@@ -72,6 +72,17 @@ class ViewerActivity : AppCompatActivity() {
     private var noiseFilterStrength = 0f
     private var noiseRiseCoeff = 0.015f
     private var noiseFallCoeff = 0.05f
+
+    // Retained from the last STANDARD render so PROCESSED PLAYBACK can reproduce the ENHANCE
+    // post-processing audibly (WYSIWYH): per (frame,row) gain = processed / original magnitude,
+    // applied to the STFT magnitude with the original phase. Null on tier-0 devices (memory) and
+    // for engine renders (reassignment/etc. aren't cleanly invertible). Display rows are the same
+    // 80–10000 Hz log axis used by the renderer.
+    private var lastOrigGrid: Array<FloatArray>? = null
+    private var lastProcGrid: Array<FloatArray>? = null
+    private var lastGridFftSize = 0
+    private var lastGridStep = 0
+    private var lastGridViewHeight = 0
     // Enhance modes. Indices 0..4 are the mutually-exclusive *engines* that build the base map
     // (shown as radio buttons). Indices 5..8 are *post-processors* that stack, in order, on top of
     // whichever engine ran (or on the plain STFT when no engine is selected).
@@ -940,6 +951,10 @@ class ViewerActivity : AppCompatActivity() {
                 activeThread = Thread.currentThread()
             }
 
+            // Invalidate retained WYSIWYH grids; only a completed standard render repopulates them.
+            lastProcGrid = null
+            lastOrigGrid = null
+
             try {
                 beginBusy()
                 // Engine priority: highest-priority selected engine wins. Each is isolated, so a
@@ -1228,6 +1243,14 @@ class ViewerActivity : AppCompatActivity() {
         }
 
         val processed = applyEnhancements(accumulationBuffer)
+        // Retain for WYSIWYH processed playback (skip on low-RAM devices to avoid OOM).
+        if (DeviceCaps.tier(this) >= 1) {
+            lastOrigGrid = accumulationBuffer
+            lastProcGrid = processed
+            lastGridFftSize = currentFftSize
+            lastGridStep = currentStepSize
+            lastGridViewHeight = viewHeight
+        }
         var enhMax = 1e-9f
         for (col in processed) for (v in col) if (v > enhMax) enhMax = v
         val maxDB = 20 * log10(enhMax + 1e-9f)
@@ -1818,6 +1841,12 @@ class ViewerActivity : AppCompatActivity() {
     private fun playProcessedAudio() {
         val pcm = rawPcmData ?: return
         stopAudio()
+        // Snapshot the retained grids (WYSIWYH enhance) so a concurrent re-render can't swap them.
+        val procGrid = lastProcGrid
+        val origGrid = lastOrigGrid
+        val gridFft = lastGridFftSize
+        val gridStep = lastGridStep
+        val gridVH = lastGridViewHeight
         thread {
             // 1) EQ (time-domain biquads).
             for (f in filters) f.reset()
@@ -1827,28 +1856,55 @@ class ViewerActivity : AppCompatActivity() {
                 for (f in filters) s = f.process(s)
                 out[i] = s
             }
-            // 2) Noise filter (spectral subtraction) with weighted overlap-add reconstruction.
-            if (noiseFilterStrength > 0f && currentFftSize >= 2) {
-                val n = currentFftSize
+
+            val n = currentFftSize
+            // WYSIWYH enhance is available when the retained grids match the current FFT params
+            // (standard render, tier ≥ 1). The grids already include EQ + noise filter, so the
+            // processed/original RATIO is the pure ENHANCE gain (EQ/filter cancel) — applied on top
+            // of the time-domain EQ (step 1) and spectral noise filter (below).
+            val applyEnhance = procGrid != null && origGrid != null &&
+                gridFft == n && gridStep == currentStepSize && gridVH > 0
+            val applyNoise = noiseFilterStrength > 0f
+
+            // 2) Single WOLA STFT pass: noise subtraction + enhance gain, original phase retained.
+            if ((applyNoise || applyEnhance) && n >= 2) {
                 val step = currentStepSize.coerceAtLeast(1)
                 val win = FloatArray(n) { (0.5f * (1 - cos(2 * PI * it / (n - 1)))).toFloat() }
                 val acc = FloatArray(out.size)
-                val wsum = FloatArray(out.size)     // Σ synthesis-window² for COLA normalization
+                val wsum = FloatArray(out.size)            // Σ synthesis-window² for COLA normalization
                 val noiseFloor = FloatArray(n / 2)
+                // Bin → display row (exact inverse of the renderer's 80–10000 Hz log mapping).
+                val logMin = log10(80f); val logMax = log10(10000f)
+                val invRow = if (applyEnhance) IntArray(n / 2) { i ->
+                    val freq = i.toFloat() * sampleRate / n
+                    if (freq <= 0f) gridVH - 1
+                    else ((logMax - log10(freq)) / (logMax - logMin) * gridVH).toInt().coerceIn(0, gridVH - 1)
+                } else IntArray(0)
+
                 var offset = 0
+                var c = 0
                 while (offset + n <= out.size) {
                     val re = FloatArray(n); val im = FloatArray(n)
                     for (i in 0 until n) re[i] = out[offset + i] * win[i]
                     FFTUtils.compute(re, im)
+                    val haveCol = applyEnhance && c < procGrid!!.size
                     for (i in 0 until n / 2) {
                         var mag = sqrt(re[i] * re[i] + im[i] * im[i])
                         val ph = atan2(im[i], re[i])
-                        noiseFloor[i] = when {
-                            noiseFloor[i] == 0f -> mag
-                            mag < noiseFloor[i] -> noiseFloor[i] * (1f - noiseFallCoeff) + mag * noiseFallCoeff
-                            else -> noiseFloor[i] * (1f - noiseRiseCoeff) + mag * noiseRiseCoeff
+                        if (applyNoise) {
+                            noiseFloor[i] = when {
+                                noiseFloor[i] == 0f -> mag
+                                mag < noiseFloor[i] -> noiseFloor[i] * (1f - noiseFallCoeff) + mag * noiseFallCoeff
+                                else -> noiseFloor[i] * (1f - noiseRiseCoeff) + mag * noiseRiseCoeff
+                            }
+                            mag = (mag - noiseFloor[i] * noiseFilterStrength).coerceAtLeast(0f)
                         }
-                        mag = (mag - noiseFloor[i] * noiseFilterStrength).coerceAtLeast(0f)
+                        if (haveCol) {
+                            val y = invRow[i]
+                            val o = origGrid!![c][y]
+                            val gain = if (o > 1e-9f) procGrid[c][y] / o else 1f
+                            mag *= gain.coerceIn(0f, 8f)    // clamp so enhancement can't blow up
+                        }
                         re[i] = mag * cos(ph); im[i] = mag * sin(ph)
                         if (i > 0) { re[n - i] = re[i]; im[n - i] = -im[i] }   // Hermitian mirror
                     }
@@ -1859,9 +1915,11 @@ class ViewerActivity : AppCompatActivity() {
                         if (idx < acc.size) { acc[idx] += re[i] * win[i]; wsum[idx] += win[i] * win[i] }
                     }
                     offset += step
+                    c++
                 }
                 for (i in out.indices) if (wsum[i] > 1e-6f) out[i] = acc[i] / wsum[i]
             }
+
             // 3) Peak-normalize to avoid clipping.
             var peak = 1e-6f
             for (v in out) { val a = abs(v); if (a > peak) peak = a }
