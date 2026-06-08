@@ -98,7 +98,20 @@ object GalleryTransfer {
 
                 val prefs = ctx.getSharedPreferences(prefsNameForFile(wav.name), Context.MODE_PRIVATE)
                 val meta = JSONObject()
-                for ((k, v) in prefs.all) if (v != null) meta.put(k, v)
+                // Type-tag every value ("f:1.0", "i:3", "b:true", "s:…") so the receiver restores
+                // the exact SharedPreferences type — JSON alone can't tell Float 0.0 from Int 0,
+                // which previously wrote Float keys (e.g. eq_gain_*) as Int and crashed on read.
+                for ((k, v) in prefs.all) {
+                    if (v == null) continue
+                    val tagged = when (v) {
+                        is Boolean -> "b:$v"
+                        is Int -> "i:$v"
+                        is Long -> "l:$v"
+                        is Float -> "f:$v"
+                        else -> "s:$v"
+                    }
+                    meta.put(k, tagged)
+                }
                 writeEntry(zip, "$base.json", meta.toString().toByteArray())
             }
         }
@@ -166,11 +179,24 @@ object GalleryTransfer {
         val o = try { JSONObject(jsonText) } catch (_: Exception) { return }
         val ed = ctx.getSharedPreferences(prefsNameForFile("$base.wav"), Context.MODE_PRIVATE).edit()
         for (k in o.keys()) {
-            when {
-                k in BOOL_KEYS -> ed.putBoolean(k, o.optBoolean(k))
-                k in STRING_KEYS -> ed.putString(k, o.optString(k))
-                k in FLOAT_KEYS -> ed.putFloat(k, o.optDouble(k).toFloat())
-                else -> ed.putInt(k, o.optInt(k))
+            val raw = o.get(k)
+            if (raw is String && raw.length >= 2 && raw[1] == ':') {
+                val rest = raw.substring(2)
+                when (raw[0]) {
+                    'b' -> ed.putBoolean(k, rest.toBoolean())
+                    'i' -> ed.putInt(k, rest.toIntOrNull() ?: 0)
+                    'l' -> ed.putLong(k, rest.toLongOrNull() ?: 0L)
+                    'f' -> ed.putFloat(k, rest.toFloatOrNull() ?: 0f)
+                    's' -> ed.putString(k, rest)
+                }
+            } else {
+                // Legacy untagged bundle: fall back to key-set heuristics.
+                when {
+                    k in BOOL_KEYS -> ed.putBoolean(k, o.optBoolean(k))
+                    k in STRING_KEYS -> ed.putString(k, o.optString(k))
+                    k in FLOAT_KEYS -> ed.putFloat(k, o.optDouble(k).toFloat())
+                    else -> ed.putInt(k, o.optInt(k))
+                }
             }
         }
         ed.apply()

@@ -116,8 +116,8 @@ class ViewerActivity : AppCompatActivity() {
         viewerFft.post {
             // Restore this recording's saved pan/zoom, and persist it whenever the user changes it.
             viewerFft.setViewState(
-                prefs.getFloat("view_zoom_x", 1f), prefs.getFloat("view_zoom_y", 1f),
-                prefs.getFloat("view_off_x", 0f), prefs.getFloat("view_off_y", 0f)
+                prefs.getFloatCoerced("view_zoom_x", 1f), prefs.getFloatCoerced("view_zoom_y", 1f),
+                prefs.getFloatCoerced("view_off_x", 0f), prefs.getFloatCoerced("view_off_y", 0f)
             )
             viewerFft.onViewStateChanged = { saveViewTransform() }
 
@@ -905,7 +905,7 @@ class ViewerActivity : AppCompatActivity() {
             val slider = findViewById<Slider>(eqIds[i])
             val txtValue = findViewById<TextView>(eqLabels[i])
             val key = "eq_gain_$i"
-            val savedGain = prefs.getFloat(key, 0f)
+            val savedGain = prefs.getFloatCoerced(key, 0f)
             slider.setSafeValue(savedGain)
             txtValue.text = getString(R.string.db_value, slider.value.toInt())
             filters[i].gainDb = slider.value
@@ -996,7 +996,7 @@ class ViewerActivity : AppCompatActivity() {
         val txtRiseValue = findViewById<TextView>(R.id.vTxtRiseValue)
         val txtFallValue = findViewById<TextView>(R.id.vTxtFallValue)
 
-        noiseFilterStrength = prefs.getFloat("noise_filter_strength", 0f)
+        noiseFilterStrength = prefs.getFloatCoerced("noise_filter_strength", 0f)
         sliderFilter.setSafeValue(noiseFilterStrength)
         txtFilterValue?.text = getString(R.string.percent_value, (noiseFilterStrength * 100).toInt())
         adjustSliderThickness(sliderFilter, txtFilterValue)
@@ -1012,7 +1012,7 @@ class ViewerActivity : AppCompatActivity() {
         sliderRise.valueFrom = 0f
         sliderRise.valueTo = 3f
         sliderRise.stepSize = 0.01f
-        val savedRiseMs = prefs.getFloat("noise_filter_rise_ms", 50f).coerceIn(1f, 1000f)
+        val savedRiseMs = prefs.getFloatCoerced("noise_filter_rise_ms", 50f).coerceIn(1f, 1000f)
         sliderRise.setSafeValue(log10(savedRiseMs.toDouble()).toFloat())
         
         adjustSliderThickness(sliderRise, txtRiseValue)
@@ -1028,7 +1028,7 @@ class ViewerActivity : AppCompatActivity() {
         sliderFall.valueFrom = 0f
         sliderFall.valueTo = 3f
         sliderFall.stepSize = 0.01f
-        val savedFallMs = prefs.getFloat("noise_filter_fall_ms", 200f).coerceIn(1f, 1000f)
+        val savedFallMs = prefs.getFloatCoerced("noise_filter_fall_ms", 200f).coerceIn(1f, 1000f)
         sliderFall.setSafeValue(log10(savedFallMs.toDouble()).toFloat())
         
         adjustSliderThickness(sliderFall, txtFallValue)

@@ -266,11 +266,11 @@ class WaveletActivity : AppCompatActivity() {
 
         decompositionLevel = prefs.getInt("level", 8)           // Default to max level (8)
         waveletOrder = prefs.getInt("order", 10)                // Default to max order (10)
-        targetFreq = prefs.getFloat("freq", 44100f)
+        targetFreq = prefs.getFloatCoerced("freq", 44100f)
 
         // Snap the saved threshold onto one of the log slider positions.
         // Default to 0f (off) for clean visualization.
-        threshold = thresholdSteps[thresholdToIndex(prefs.getFloat("threshold", 0f))]
+        threshold = thresholdSteps[thresholdToIndex(prefs.getFloatCoerced("threshold", 0f))]
 
         colorSchemeIdx = ColorMaps.loadForRecording(this, prefs)
         cwtWaveletIdx = prefs.getInt("cwt_wavelet", 0)

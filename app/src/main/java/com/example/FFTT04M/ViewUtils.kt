@@ -1,5 +1,6 @@
 package com.example.FFTT04M
 
+import android.content.SharedPreferences
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.util.TypedValue
@@ -349,3 +350,15 @@ fun android.content.Context.showColorSchemeDialog(currentIdx: Int, onPick: (Int)
     }
     dialog.show()
 }
+
+/**
+ * Read a Float pref that may have been corrupted to another numeric type by an older buggy import
+ * (e.g. a Float key stored as Int). Coerces any Number back to Float instead of throwing
+ * ClassCastException; falls back to [def] for anything else.
+ */
+fun SharedPreferences.getFloatCoerced(key: String, def: Float): Float =
+    try {
+        getFloat(key, def)
+    } catch (e: ClassCastException) {
+        (all[key] as? Number)?.toFloat() ?: def
+    }

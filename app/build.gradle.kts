@@ -35,6 +35,9 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+        // Backport java.util default methods (e.g. List.sort(Comparator), used by ZXing) to API 23.
+        // Without this the QR scanner throws NoSuchMethodError on the Nexus 7 (API 23).
+        isCoreLibraryDesugaringEnabled = true
     }
 
     lint {
@@ -65,6 +68,7 @@ dependencies {
     implementation(libs.material)
     // QR generate/scan for device-to-device gallery transfer (pure Java, no Play Services).
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
