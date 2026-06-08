@@ -77,7 +77,9 @@ class TransferService : Service() {
             "bt" -> {
                 val addr = intent.getStringExtra(EX_BT_ADDR) ?: return
                 val adapter = (getSystemService(BluetoothManager::class.java))?.adapter ?: return
-                adapter.cancelDiscovery()
+                // Best-effort only; needs BLUETOOTH_SCAN on API 31+ which we don't hold (we use
+                // bonded devices, never discovery). Swallow so it can't kill the transfer.
+                runCatching { adapter.cancelDiscovery() }
                 android.util.Log.i(TAG, "bt connecting to $addr")
                 adapter.getRemoteDevice(addr).createRfcommSocketToServiceRecord(GalleryTransfer.BT_UUID).use { sock ->
                     sock.connect()
