@@ -223,6 +223,7 @@ class ViewerActivity : AppCompatActivity() {
             finish()
         }
         findViewById<Button>(R.id.btnViewerPlay)?.setOnClickListener { playAudio() }
+        findViewById<Button>(R.id.btnViewerProcessed)?.setOnClickListener { playProcessedAudio() }
 
         findViewById<Button?>(R.id.btnViewerNote)?.setOnClickListener { showCommentDialog() }
 
@@ -1742,55 +1743,121 @@ class ViewerActivity : AppCompatActivity() {
                 audioData[i] = (pcm[i].coerceIn(-1f, 1f) * 32767).toInt().toShort()
             }
 
-            val bufferSize = AudioTrack.getMinBufferSize(
-                sampleRate,
-                AudioFormat.CHANNEL_OUT_MONO,
-                AudioFormat.ENCODING_PCM_16BIT
+            startPlayback(audioData)
+        }
+    }
+
+    /** Build the AudioTrack, play [audioData], and drive the play cursor. Call on a background
+     *  thread (blocking write + cursor poll). */
+    private fun startPlayback(audioData: ShortArray) {
+        val bufferSize = AudioTrack.getMinBufferSize(
+            sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT
+        )
+        audioTrack = AudioTrack.Builder()
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                    .build()
             )
-
-            audioTrack = AudioTrack.Builder()
-                .setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_MEDIA)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                        .build()
-                )
-                .setAudioFormat(
-                    AudioFormat.Builder()
-                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                        .setSampleRate(sampleRate)
-                        .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
-                        .build()
-                )
-                .setBufferSizeInBytes(bufferSize.coerceAtLeast(audioData.size * 2))
-                .setTransferMode(AudioTrack.MODE_STATIC)
-                .build()
-
-            audioTrack?.apply {
-                write(audioData, 0, audioData.size, AudioTrack.WRITE_BLOCKING)
-                play()
-            }
-
-            // Drive the Play cursor across the spectrogram from the playback head position.
-            val track = audioTrack
-            if (track != null) {
-                val totalFrames = audioData.size.coerceAtLeast(1)
-                try {
-                    while (audioTrack === track) {
-                        val pos = track.playbackHeadPosition
-                        runOnUiThread {
-                            if (!isFinishing && !isDestroyed) {
-                                viewerFft.setPlayCursor((pos.toFloat() / totalFrames).coerceIn(0f, 1f))
-                            }
+            .setAudioFormat(
+                AudioFormat.Builder()
+                    .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                    .setSampleRate(sampleRate)
+                    .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                    .build()
+            )
+            .setBufferSizeInBytes(bufferSize.coerceAtLeast(audioData.size * 2))
+            .setTransferMode(AudioTrack.MODE_STATIC)
+            .build()
+        audioTrack?.apply {
+            write(audioData, 0, audioData.size, AudioTrack.WRITE_BLOCKING)
+            play()
+        }
+        val track = audioTrack
+        if (track != null) {
+            val totalFrames = audioData.size.coerceAtLeast(1)
+            try {
+                while (audioTrack === track) {
+                    val pos = track.playbackHeadPosition
+                    runOnUiThread {
+                        if (!isFinishing && !isDestroyed) {
+                            viewerFft.setPlayCursor((pos.toFloat() / totalFrames).coerceIn(0f, 1f))
                         }
-                        if (pos >= totalFrames || track.playState != AudioTrack.PLAYSTATE_PLAYING) break
-                        Thread.sleep(30)
                     }
-                } catch (_: Throwable) {}
-                runOnUiThread {
-                    if (!isFinishing && !isDestroyed) viewerFft.clearPlayCursor()
+                    if (pos >= totalFrames || track.playState != AudioTrack.PLAYSTATE_PLAYING) break
+                    Thread.sleep(30)
                 }
+            } catch (_: Throwable) {}
+            runOnUiThread {
+                if (!isFinishing && !isDestroyed) viewerFft.clearPlayCursor()
             }
+        }
+    }
+
+    /**
+     * PROCESSED PLAYBACK — hear the EQ + noise-filter applied to the recording (vs. the raw PLAY
+     * button). EQ is the time-domain biquads; the noise filter is spectral subtraction reconstructed
+     * with Hann analysis+synthesis windows and COLA overlap-add normalization (the raw player skips
+     * this on purpose). Output is peak-normalized so EQ boosts don't clip. DISPLAY-tab image
+     * enhancements (Gabor/Frangi/Reassignment/etc.) are not audio-invertible and are NOT applied.
+     * EXPERIMENTAL — needs on-device listening to tune.
+     */
+    private fun playProcessedAudio() {
+        val pcm = rawPcmData ?: return
+        stopAudio()
+        thread {
+            // 1) EQ (time-domain biquads).
+            for (f in filters) f.reset()
+            val out = FloatArray(pcm.size)
+            for (i in pcm.indices) {
+                var s = pcm[i]
+                for (f in filters) s = f.process(s)
+                out[i] = s
+            }
+            // 2) Noise filter (spectral subtraction) with weighted overlap-add reconstruction.
+            if (noiseFilterStrength > 0f && currentFftSize >= 2) {
+                val n = currentFftSize
+                val step = currentStepSize.coerceAtLeast(1)
+                val win = FloatArray(n) { (0.5f * (1 - cos(2 * PI * it / (n - 1)))).toFloat() }
+                val acc = FloatArray(out.size)
+                val wsum = FloatArray(out.size)     // Σ synthesis-window² for COLA normalization
+                val noiseFloor = FloatArray(n / 2)
+                var offset = 0
+                while (offset + n <= out.size) {
+                    val re = FloatArray(n); val im = FloatArray(n)
+                    for (i in 0 until n) re[i] = out[offset + i] * win[i]
+                    FFTUtils.compute(re, im)
+                    for (i in 0 until n / 2) {
+                        var mag = sqrt(re[i] * re[i] + im[i] * im[i])
+                        val ph = atan2(im[i], re[i])
+                        noiseFloor[i] = when {
+                            noiseFloor[i] == 0f -> mag
+                            mag < noiseFloor[i] -> noiseFloor[i] * (1f - noiseFallCoeff) + mag * noiseFallCoeff
+                            else -> noiseFloor[i] * (1f - noiseRiseCoeff) + mag * noiseRiseCoeff
+                        }
+                        mag = (mag - noiseFloor[i] * noiseFilterStrength).coerceAtLeast(0f)
+                        re[i] = mag * cos(ph); im[i] = mag * sin(ph)
+                        if (i > 0) { re[n - i] = re[i]; im[n - i] = -im[i] }   // Hermitian mirror
+                    }
+                    re[n / 2] = 0f; im[n / 2] = 0f
+                    FFTUtils.inverse(re, im)
+                    for (i in 0 until n) {
+                        val idx = offset + i
+                        if (idx < acc.size) { acc[idx] += re[i] * win[i]; wsum[idx] += win[i] * win[i] }
+                    }
+                    offset += step
+                }
+                for (i in out.indices) if (wsum[i] > 1e-6f) out[i] = acc[i] / wsum[i]
+            }
+            // 3) Peak-normalize to avoid clipping.
+            var peak = 1e-6f
+            for (v in out) { val a = abs(v); if (a > peak) peak = a }
+            val gain = if (peak > 1f) 1f / peak else 1f
+            val audioData = ShortArray(out.size) {
+                ((out[it] * gain).coerceIn(-1f, 1f) * 32767).toInt().toShort()
+            }
+            startPlayback(audioData)
         }
     }
 

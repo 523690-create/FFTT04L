@@ -703,15 +703,19 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 if (read > 0) {
+                    // RAW mic → recording buffer first. The EQ must NOT colour what we save/play;
+                    // it is a DISPLAY-only control now (applied to the FFT copy below).
+                    for (i in 0 until read) {
+                        audioCircularBuffer[audioWriteIndex] = audioBuffer[i]
+                        audioWriteIndex = (audioWriteIndex + 1) % audioBufferSize
+                    }
+
+                    // EQ affects only the waterfall: run the biquads on the samples fed to the FFT.
+                    // (Run on every sample to keep the IIR state continuous.)
                     for (i in 0 until read) {
                         var s = audioBuffer[i]
                         for (f in filters) s = f.process(s)
                         audioBuffer[i] = s
-                    }
-
-                    for (i in 0 until read) {
-                        audioCircularBuffer[audioWriteIndex] = audioBuffer[i]
-                        audioWriteIndex = (audioWriteIndex + 1) % audioBufferSize
                     }
 
                     System.arraycopy(fftInput, read, fftInput, 0, fftSize - read)
