@@ -1,9 +1,16 @@
 package com.example.FFTT04M
 
+import android.Manifest
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothManager
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import androidx.core.content.ContextCompat
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -33,9 +40,70 @@ class GalleryActivity : AppCompatActivity() {
     private var isGridView = false
     private var files = mutableListOf<File>()
 
-    // Scanner result (receiver side): scanned the donor's QR -> connect and pull the bundle.
+    // Scanner result (receiver side): a Wi-Fi (FFTT1) or Bluetooth (FFTTBT) handshake.
     private val scanLauncher = registerForActivityResult(ScanContract()) { result ->
-        result.contents?.let { receiveBundleFrom(it) }
+        result.contents?.let { handleScanned(it) }
+    }
+
+    // Runtime BLUETOOTH_CONNECT request (API 31+); runs the stashed action once granted.
+    private var pendingBtAction: (() -> Unit)? = null
+    private val btPermLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        val a = pendingBtAction; pendingBtAction = null
+        if (granted) a?.invoke() else Toast.makeText(this, "Bluetooth permission is needed", Toast.LENGTH_LONG).show()
+    }
+
+    private fun ensureBtPermission(action: () -> Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+            pendingBtAction = action
+            btPermLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
+        } else action()
+    }
+
+    private fun handleScanned(s: String) {
+        when {
+            s.startsWith("${GalleryTransfer.HANDSHAKE_PREFIX}:") -> receiveBundleFrom(s)           // Wi-Fi
+            s.startsWith("${GalleryTransfer.BT_PREFIX}:") -> {
+                val parts = s.split(":", limit = 3)                                                // FFTTBT:token:name
+                if (parts.size < 3) { Toast.makeText(this, "Bad Bluetooth code", Toast.LENGTH_SHORT).show() }
+                else ensureBtPermission { receiveViaBluetooth(parts[1], parts[2]) }
+            }
+            else -> Toast.makeText(this, "Not an FFTT transfer code", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    /** Connect to the already-paired sender (matched by Bluetooth name) and pull the missing files. */
+    private fun receiveViaBluetooth(token: String, name: String) {
+        val adapter = (getSystemService(BluetoothManager::class.java))?.adapter
+        if (adapter == null) { Toast.makeText(this, "No Bluetooth on this device", Toast.LENGTH_LONG).show(); return }
+        if (!adapter.isEnabled) { Toast.makeText(this, "Turn Bluetooth on, then try again", Toast.LENGTH_LONG).show(); return }
+        val bonded = try { adapter.bondedDevices } catch (e: SecurityException) { null } ?: emptySet()
+        val matches = bonded.filter { (runCatching { it.name }.getOrNull() ?: "") == name }
+        when {
+            matches.isEmpty() -> Toast.makeText(this,
+                "Pair \"$name\" in Bluetooth settings first, then scan again", Toast.LENGTH_LONG).show()
+            matches.size == 1 -> connectBluetooth(adapter, matches[0], token)
+            else -> AlertDialog.Builder(this)
+                .setTitle("Choose device")
+                .setItems(matches.map { it.name }.toTypedArray()) { _, i -> connectBluetooth(adapter, matches[i], token) }
+                .show()
+        }
+    }
+
+    private fun connectBluetooth(adapter: BluetoothAdapter, device: BluetoothDevice, token: String) {
+        Toast.makeText(this, "Connecting to ${runCatching { device.name }.getOrNull() ?: "device"}…", Toast.LENGTH_SHORT).show()
+        thread {
+            try {
+                adapter.cancelDiscovery()
+                device.createRfcommSocketToServiceRecord(GalleryTransfer.BT_UUID).use { sock ->
+                    sock.connect()
+                    val res = GalleryTransfer.receiveNegotiated(this, sock.inputStream, sock.outputStream, token)
+                    runOnUiThread { reportImport(res) }
+                }
+            } catch (e: Throwable) {
+                runOnUiThread { Toast.makeText(this, "Bluetooth receive failed: ${e.message}", Toast.LENGTH_LONG).show() }
+            }
+        }
     }
 
     // Import a gallery bundle file picked from anywhere (Files, Drive, a download, etc.).
@@ -113,11 +181,12 @@ class GalleryActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnShare).setOnClickListener { showShareDialog() }
     }
 
-    /** SHARE → QR transfer (same Wi-Fi) or file transfer (any network, via the OS share sheet). */
+    /** SHARE → Bluetooth (paired, no network), Wi-Fi QR (same LAN), or file (any network). */
     private fun showShareDialog() {
         val options = arrayOf(
-            "Send via QR (same Wi-Fi)",
-            "Receive via QR (same Wi-Fi)",
+            "Send via Bluetooth",
+            "Receive (scan QR)",
+            "Send via Wi-Fi QR",
             "Export / share to file…",
             "Import from file…"
         )
@@ -125,21 +194,20 @@ class GalleryActivity : AppCompatActivity() {
             .setTitle("Share gallery")
             .setItems(options) { _, which ->
                 when (which) {
-                    0 -> {
-                        if (GalleryTransfer.recordingWavs(this).isEmpty()) {
-                            Toast.makeText(this, "No recordings to send", Toast.LENGTH_SHORT).show()
-                        } else {
-                            startActivity(Intent(this, ExportActivity::class.java))   // QR, streams on connect
-                        }
-                    }
-                    1 -> scanLauncher.launch(ScanOptions().apply {
+                    0 -> if (GalleryTransfer.recordingWavs(this).isEmpty())
+                        Toast.makeText(this, "No recordings to send", Toast.LENGTH_SHORT).show()
+                    else startActivity(Intent(this, BtSendActivity::class.java))
+                    1 -> scanLauncher.launch(ScanOptions().apply {        // Wi-Fi or Bluetooth QR
                         setDesiredBarcodeFormats(ScanOptions.QR_CODE)
                         setPrompt("Scan the QR shown on the SENDING device")
                         setBeepEnabled(false)
                         setOrientationLocked(false)
                     })
-                    2 -> exportToFile()
-                    3 -> importFileLauncher.launch("*/*")
+                    2 -> if (GalleryTransfer.recordingWavs(this).isEmpty())
+                        Toast.makeText(this, "No recordings to send", Toast.LENGTH_SHORT).show()
+                    else startActivity(Intent(this, ExportActivity::class.java))
+                    3 -> exportToFile()
+                    4 -> importFileLauncher.launch("*/*")
                 }
             }
             .setNegativeButton("Cancel", null)

@@ -119,16 +119,21 @@ Heavier filters (Gabor, Frangi) are disabled on older/low-memory devices and lab
 ## Sharing recordings between devices
 
 Two devices running this app can transfer recordings — **with all their analysis settings,
-comments, and thumbnails** — directly over Wi-Fi, no internet or account needed.
+comments, and thumbnails** — directly, no internet or account needed. Recordings the receiver
+already has are **skipped** (only the missing ones transfer), so re-sharing is safe.
 
-1. Put **both devices on the same Wi-Fi network**.
-2. On the **sending** device: **Gallery → SHARE → Send via QR**. A QR code appears.
-3. On the **receiving** device: **Gallery → SHARE → Receive via QR**, then point the camera at
-   the sending device's QR code.
-4. The whole gallery transfers; imported recordings keep their own colour/analysis settings.
-   Name clashes are auto-renamed (e.g. `…_imp`), so nothing is overwritten.
+**Bluetooth (most reliable — no Wi-Fi needed):**
+1. **One-time:** pair the two devices in Android's Bluetooth settings.
+2. Sender: **Gallery → SHARE → Send via Bluetooth**. A QR appears.
+3. Receiver: **Gallery → SHARE → Receive (scan QR)**, then scan it. The transfer runs over
+   Bluetooth — works even with no Wi-Fi or on mobile data.
 
-The QR code only carries the connection handshake; the audio itself streams over Wi-Fi.
+**Wi-Fi QR (faster, same network):**
+1. Both devices on the **same Wi-Fi**.
+2. Sender: **SHARE → Send via Wi-Fi QR**. Receiver: **SHARE → Receive (scan QR)**, scan it.
+   (If it times out, the Wi-Fi is likely blocking device-to-device — use Bluetooth or file.)
+
+The QR only carries the connection handshake; the recordings stream over the chosen link.
 
 **On different networks (mobile data, different Wi-Fi)?** Use **SHARE → Export / share to
 file…** on the sending device — it packages the gallery into a `.zip` and opens the system

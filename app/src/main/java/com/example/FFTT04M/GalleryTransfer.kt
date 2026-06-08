@@ -24,7 +24,10 @@ import java.util.zip.ZipOutputStream
  */
 object GalleryTransfer {
 
-    const val HANDSHAKE_PREFIX = "FFTT1"   // QR payload: FFTT1:<ip>:<port>:<token>
+    const val HANDSHAKE_PREFIX = "FFTT1"   // Wi-Fi QR payload: FFTT1:<ip>:<port>:<token>
+    const val BT_PREFIX = "FFTTBT"         // Bluetooth QR payload: FFTTBT:<token>:<senderBtName>
+    // Fixed RFCOMM service UUID for the app (any random constant works as long as both ends agree).
+    val BT_UUID: java.util.UUID = java.util.UUID.fromString("5f9b34fb-ffa1-4f2e-9c3a-0f4a04040401")
 
     // Per-recording pref keys are mostly Int; these are the exceptions. Used on import so JSON
     // number ambiguity (44100.0 -> "44100") can't write a Float key as an Int (which would later
@@ -50,6 +53,34 @@ object GalleryTransfer {
     fun recordingWavs(ctx: Context): List<File> =
         recordingsDir(ctx)?.listFiles { f -> f.extension == "wav" || f.extension == "flac" }
             ?.sortedBy { it.name } ?: emptyList()
+
+    /** Base names of the recordings already present (for transfer negotiation). */
+    fun existingBaseNames(ctx: Context): Set<String> =
+        recordingWavs(ctx).map { it.nameWithoutExtension }.toSet()
+
+    // ---- Negotiated transfer (transport-agnostic: Bluetooth RFCOMM or a TCP socket) -------------
+    // Wire protocol once a stream pair is connected:
+    //   receiver → sender:  "<token>\n"  then  "<csv of existing base names>\n"
+    //   sender   → receiver: a ZIP bundle of ONLY the recordings the receiver doesn't have, to EOF.
+
+    /** Sender side: verify the token, read the receiver's existing names, stream only the missing
+     *  recordings. Returns how many were sent (or -1 on token mismatch). */
+    fun sendNegotiated(ctx: Context, inp: InputStream, out: OutputStream, expectedToken: String): Int {
+        if (readLine(inp) != expectedToken) return -1
+        val have = readLine(inp).split(",").filter { it.isNotEmpty() }.toHashSet()
+        val missing = recordingWavs(ctx).filter { it.nameWithoutExtension !in have }
+        buildBundle(ctx, missing, out)
+        out.flush()
+        return missing.size
+    }
+
+    /** Receiver side: send the token + our existing names, then import the streamed bundle. */
+    fun receiveNegotiated(ctx: Context, inp: InputStream, out: OutputStream, token: String): ImportResult {
+        val names = existingBaseNames(ctx).joinToString(",") { it.replace(",", "_") }
+        out.write("$token\n$names\n".toByteArray())
+        out.flush()
+        return importBundle(ctx, inp)
+    }
 
     // ---- Export ---------------------------------------------------------------------------------
 
