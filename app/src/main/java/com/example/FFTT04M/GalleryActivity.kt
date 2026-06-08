@@ -91,19 +91,31 @@ class GalleryActivity : AppCompatActivity() {
     }
 
     private fun connectBluetooth(adapter: BluetoothAdapter, device: BluetoothDevice, token: String) {
-        Toast.makeText(this, "Connecting to ${runCatching { device.name }.getOrNull() ?: "device"}…", Toast.LENGTH_SHORT).show()
-        thread {
-            try {
-                adapter.cancelDiscovery()
-                device.createRfcommSocketToServiceRecord(GalleryTransfer.BT_UUID).use { sock ->
-                    sock.connect()
-                    val res = GalleryTransfer.receiveNegotiated(this, sock.inputStream, sock.outputStream, token)
-                    runOnUiThread { reportImport(res) }
-                }
-            } catch (e: Throwable) {
-                runOnUiThread { Toast.makeText(this, "Bluetooth receive failed: ${e.message}", Toast.LENGTH_LONG).show() }
-            }
+        val addr = runCatching { device.address }.getOrNull()
+        if (addr == null) { Toast.makeText(this, "Couldn't read device address", Toast.LENGTH_LONG).show(); return }
+        startReceiveService {
+            putExtra(TransferService.EX_TRANSPORT, "bt")
+            putExtra(TransferService.EX_TOKEN, token)
+            putExtra(TransferService.EX_BT_ADDR, addr)
         }
+    }
+
+    // Best-effort POST_NOTIFICATIONS (API 33+) so transfer notifications show; runs the action either way.
+    private var pendingNotifAction: (() -> Unit)? = null
+    private val notifPermLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { _ ->
+        val a = pendingNotifAction; pendingNotifAction = null; a?.invoke()
+    }
+
+    private fun startReceiveService(extras: Intent.() -> Unit) {
+        val launch = {
+            ContextCompat.startForegroundService(this, Intent(this, TransferService::class.java).apply(extras))
+            Toast.makeText(this, "Receiving in the background — watch your notifications", Toast.LENGTH_LONG).show()
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            pendingNotifAction = launch
+            notifPermLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else launch()
     }
 
     // Import a gallery bundle file picked from anywhere (Files, Drive, a download, etc.).
@@ -257,28 +269,11 @@ class GalleryActivity : AppCompatActivity() {
         val ip = parts[1]
         val port = parts[2].toIntOrNull() ?: return
         val token = parts[3]
-        Toast.makeText(this, "Receiving…", Toast.LENGTH_SHORT).show()
-        thread {
-            try {
-                Socket().use { sock ->
-                    // Fail fast (8s) instead of hanging; the usual cause is router AP/client
-                    // isolation blocking device-to-device traffic even on the same Wi-Fi.
-                    sock.connect(java.net.InetSocketAddress(ip, port), 8000)
-                    sock.getOutputStream().apply { write("$token\n".toByteArray()); flush() }
-                    val res = GalleryTransfer.importBundle(this, sock.getInputStream())
-                    runOnUiThread { reportImport(res) }
-                }
-            } catch (e: java.net.SocketTimeoutException) {
-                runOnUiThread { Toast.makeText(this,
-                    "Couldn't reach the other device. This Wi-Fi may block device-to-device (AP isolation) — try a phone hotspot, or use Export/Import to file.",
-                    Toast.LENGTH_LONG).show() }
-            } catch (e: java.net.ConnectException) {
-                runOnUiThread { Toast.makeText(this,
-                    "Connection refused. Make sure the other device still shows its QR, and that the Wi-Fi allows device-to-device.",
-                    Toast.LENGTH_LONG).show() }
-            } catch (e: Throwable) {
-                runOnUiThread { Toast.makeText(this, "Receive failed: ${e.message}", Toast.LENGTH_LONG).show() }
-            }
+        startReceiveService {
+            putExtra(TransferService.EX_TRANSPORT, "wifi")
+            putExtra(TransferService.EX_TOKEN, token)
+            putExtra(TransferService.EX_IP, ip)
+            putExtra(TransferService.EX_PORT, port)
         }
     }
 

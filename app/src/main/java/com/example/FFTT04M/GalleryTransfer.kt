@@ -75,11 +75,12 @@ object GalleryTransfer {
     }
 
     /** Receiver side: send the token + our existing names, then import the streamed bundle. */
-    fun receiveNegotiated(ctx: Context, inp: InputStream, out: OutputStream, token: String): ImportResult {
+    fun receiveNegotiated(ctx: Context, inp: InputStream, out: OutputStream, token: String,
+                          onImported: ((Int, String) -> Unit)? = null): ImportResult {
         val names = existingBaseNames(ctx).joinToString(",") { it.replace(",", "_") }
         out.write("$token\n$names\n".toByteArray())
         out.flush()
-        return importBundle(ctx, inp)
+        return importBundle(ctx, inp, onImported)
     }
 
     // ---- Export ---------------------------------------------------------------------------------
@@ -133,8 +134,9 @@ object GalleryTransfer {
     // ---- Import ---------------------------------------------------------------------------------
 
     /** Reads a bundle stream into the recordings dir, restoring metadata. Recordings already present
-     *  (same filename) are skipped. Returns counts of imported vs skipped. */
-    fun importBundle(ctx: Context, inp: InputStream): ImportResult {
+     *  (same filename) are skipped. [onImported] fires (runningCount, baseName) per new recording —
+     *  used to post a per-file notification. Returns counts of imported vs skipped. */
+    fun importBundle(ctx: Context, inp: InputStream, onImported: ((Int, String) -> Unit)? = null): ImportResult {
         val dir = recordingsDir(ctx) ?: return ImportResult(0, 0)
         // Keep original filenames. A recording already present (same base name) is skipped wholesale
         // — files and metadata left untouched — so re-sharing the same gallery is idempotent.
@@ -163,7 +165,11 @@ object GalleryTransfer {
                     when {
                         ext == "wav" || ext == "flac" -> {
                             if (dup) skipped++
-                            else { File(dir, "$base.$ext").outputStream().use { zip.copyTo(it) }; imported++ }
+                            else {
+                                File(dir, "$base.$ext").outputStream().use { zip.copyTo(it) }
+                                imported++
+                                onImported?.invoke(imported, base)
+                            }
                         }
                         dup -> { }                                  // already have it: skip sidecars
                         ext == "json" -> if (applyMeta) pendingMeta.add(base to zip.readBytes().toString(Charsets.UTF_8))

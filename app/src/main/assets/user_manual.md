@@ -134,6 +134,9 @@ already has are **skipped** (only the missing ones transfer), so re-sharing is s
    (If it times out, the Wi-Fi is likely blocking device-to-device — use Bluetooth or file.)
 
 The QR only carries the connection handshake; the recordings stream over the chosen link.
+**Receiving runs in the background** — once you scan, you can leave the Gallery; a notification
+pops up as each recording arrives, and a final one summarises how many were imported/skipped.
+Tap any of them to return to the Gallery. (Allow the notification permission when asked.)
 
 **On different networks (mobile data, different Wi-Fi)?** Use **SHARE → Export / share to
 file…** on the sending device — it packages the gallery into a `.zip` and opens the system
