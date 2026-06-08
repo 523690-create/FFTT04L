@@ -88,27 +88,20 @@ object GalleryTransfer {
 
     // ---- Import ---------------------------------------------------------------------------------
 
-    /** Reads a bundle stream into filesDir, restoring metadata. Returns the number of recordings
-     *  imported. Collisions are de-duplicated by appending _imp / _imp2 … to the whole recording
-     *  (file set + prefs namespace stay consistent). */
-    fun importBundle(ctx: Context, inp: InputStream): Int {
-        val dir = recordingsDir(ctx) ?: return 0
-        val baseMap = HashMap<String, String>()
-        val used = HashSet<String>()
-        val pendingMeta = ArrayList<Pair<String, String>>()
-        var count = 0
-
-        fun finalBaseFor(orig: String): String {
-            baseMap[orig]?.let { return it }
-            var cand = orig
-            var i = 1
-            while (File(dir, "$cand.wav").exists() || File(dir, "$cand.flac").exists() || cand in used) {
-                cand = orig + "_imp" + (if (i > 1) i.toString() else "")
-                i++
-            }
-            used.add(cand); baseMap[orig] = cand
-            return cand
+    /** Reads a bundle stream into the recordings dir, restoring metadata. Recordings already present
+     *  (same filename) are skipped. Returns counts of imported vs skipped. */
+    fun importBundle(ctx: Context, inp: InputStream): ImportResult {
+        val dir = recordingsDir(ctx) ?: return ImportResult(0, 0)
+        // Keep original filenames. A recording already present (same base name) is skipped wholesale
+        // — files and metadata left untouched — so re-sharing the same gallery is idempotent.
+        val isDup = HashMap<String, Boolean>()
+        fun duplicate(base: String): Boolean = isDup.getOrPut(base) {
+            File(dir, "$base.wav").exists() || File(dir, "$base.flac").exists()
         }
+
+        val pendingMeta = ArrayList<Pair<String, String>>()
+        var imported = 0
+        var skipped = 0
 
         ZipInputStream(BufferedInputStream(inp)).use { zip ->
             var e: ZipEntry? = zip.nextEntry
@@ -116,21 +109,27 @@ object GalleryTransfer {
                 val nm = e.name
                 if (nm != "manifest.json" && !e.isDirectory && nm.contains('.')) {
                     val ext = nm.substringAfterLast('.')
-                    val fb = finalBaseFor(nm.substringBeforeLast('.'))
-                    if (ext == "json") {
-                        pendingMeta.add(fb to zip.readBytes().toString(Charsets.UTF_8))
-                    } else {
-                        File(dir, "$fb.$ext").outputStream().use { zip.copyTo(it) }
-                        if (ext == "wav" || ext == "flac") count++
+                    val base = nm.substringBeforeLast('.')
+                    val dup = duplicate(base)
+                    when {
+                        ext == "wav" || ext == "flac" -> {
+                            if (dup) skipped++
+                            else { File(dir, "$base.$ext").outputStream().use { zip.copyTo(it) }; imported++ }
+                        }
+                        !dup && ext == "json" -> pendingMeta.add(base to zip.readBytes().toString(Charsets.UTF_8))
+                        !dup -> File(dir, "$base.$ext").outputStream().use { zip.copyTo(it) }
                     }
                 }
                 zip.closeEntry()
                 e = zip.nextEntry
             }
         }
-        for ((fb, json) in pendingMeta) restoreMeta(ctx, fb, json)
-        return count
+        for ((b, json) in pendingMeta) restoreMeta(ctx, b, json)
+        return ImportResult(imported, skipped)
     }
+
+    /** Outcome of [importBundle]: how many recordings were added vs skipped as already-present. */
+    data class ImportResult(val imported: Int, val skipped: Int)
 
     private fun restoreMeta(ctx: Context, base: String, jsonText: String) {
         val o = try { JSONObject(jsonText) } catch (_: Exception) { return }

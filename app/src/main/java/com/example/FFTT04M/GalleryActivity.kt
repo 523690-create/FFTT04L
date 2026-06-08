@@ -49,21 +49,26 @@ class GalleryActivity : AppCompatActivity() {
         Toast.makeText(this, "Importing…", Toast.LENGTH_SHORT).show()
         thread {
             try {
-                val count = contentResolver.openInputStream(uri)?.use {
+                val res = contentResolver.openInputStream(uri)?.use {
                     GalleryTransfer.importBundle(this, it)
-                } ?: 0
-                runOnUiThread {
-                    if (count > 0) {
-                        Toast.makeText(this, "Imported $count recording(s)", Toast.LENGTH_LONG).show()
-                        loadFiles()
-                    } else {
-                        Toast.makeText(this, "No FFTT recordings found in that file", Toast.LENGTH_LONG).show()
-                    }
-                }
+                } ?: GalleryTransfer.ImportResult(0, 0)
+                runOnUiThread { reportImport(res) }
             } catch (e: Throwable) {
                 runOnUiThread { Toast.makeText(this, "Import failed: ${e.message}", Toast.LENGTH_LONG).show() }
             }
         }
+    }
+
+    /** Toast the import outcome and refresh the grid when anything new arrived. */
+    private fun reportImport(res: GalleryTransfer.ImportResult) {
+        val msg = when {
+            res.imported > 0 && res.skipped > 0 -> "Imported ${res.imported}, skipped ${res.skipped} already present"
+            res.imported > 0 -> "Imported ${res.imported} recording(s)"
+            res.skipped > 0 -> "All ${res.skipped} already present"
+            else -> "No FFTT recordings found in that file"
+        }
+        Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
+        if (res.imported > 0) loadFiles()
     }
 
     /** Handle a shared bundle opened from outside the app (Quick Share / Files → "open with FFTT"). */
@@ -189,11 +194,8 @@ class GalleryActivity : AppCompatActivity() {
             try {
                 Socket(ip, port).use { sock ->
                     sock.getOutputStream().apply { write("$token\n".toByteArray()); flush() }
-                    val count = GalleryTransfer.importBundle(this, sock.getInputStream())
-                    runOnUiThread {
-                        Toast.makeText(this, "Imported $count recording(s)", Toast.LENGTH_LONG).show()
-                        loadFiles()
-                    }
+                    val res = GalleryTransfer.importBundle(this, sock.getInputStream())
+                    runOnUiThread { reportImport(res) }
                 }
             } catch (e: Throwable) {
                 runOnUiThread { Toast.makeText(this, "Receive failed: ${e.message}", Toast.LENGTH_LONG).show() }
