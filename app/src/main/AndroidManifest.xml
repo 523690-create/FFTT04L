@@ -32,9 +32,22 @@
 
         <activity
             android:name=".GalleryActivity"
-            android:exported="false"
+            android:exported="true"
+            android:launchMode="singleTop"
             android:label="@string/title_gallery"
-            android:screenOrientation="fullSensor" />
+            android:screenOrientation="fullSensor">
+            <!-- Receive a shared gallery bundle (a .zip) from Quick Share / Files / etc.:
+                 tapping it offers FFTT, which imports it. The handler validates the contents,
+                 so non-FFTT zips are politely rejected. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:mimeType="application/zip" />
+            </intent-filter>
+        </activity>
 
         <activity
             android:name=".ViewerActivity"

@@ -131,9 +131,10 @@ comments, and thumbnails** — directly over Wi-Fi, no internet or account neede
 The QR code only carries the connection handshake; the audio itself streams over Wi-Fi.
 
 **On different networks (mobile data, different Wi-Fi)?** Use **SHARE → Export / share to
-file…** on the sending device — it packages the gallery into a `.fftt` file and opens the
-system share sheet (Quick Share, Bluetooth, email, Drive, …), which works across any network.
-On the other device, **SHARE → Import from file…** and pick the `.fftt`.
+file…** on the sending device — it packages the gallery into a `.zip` and opens the system
+share sheet (Quick Share, Bluetooth, email, Drive, …), which works across any network. On the
+receiving device, **tap the received file and choose FFTT** to import it, or use **SHARE →
+Import from file…** and pick it.
 
 ## Tips
 

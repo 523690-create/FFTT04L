@@ -2,6 +2,7 @@ package com.example.FFTT04M
 
 import android.content.Intent
 import android.graphics.BitmapFactory
+import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -37,9 +38,14 @@ class GalleryActivity : AppCompatActivity() {
         result.contents?.let { receiveBundleFrom(it) }
     }
 
-    // Import a .fftt bundle file picked from anywhere (Files, Drive, a download, etc.).
+    // Import a gallery bundle file picked from anywhere (Files, Drive, a download, etc.).
     private val importFileLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        uri ?: return@registerForActivityResult
+        uri?.let { importFromUri(it) }
+    }
+
+    /** Import a bundle from any content/file URI (the file picker AND the VIEW intent both use this).
+     *  Validates: a zip with no FFTT recordings is politely rejected rather than silently doing nothing. */
+    private fun importFromUri(uri: Uri) {
         Toast.makeText(this, "Importing…", Toast.LENGTH_SHORT).show()
         thread {
             try {
@@ -47,13 +53,28 @@ class GalleryActivity : AppCompatActivity() {
                     GalleryTransfer.importBundle(this, it)
                 } ?: 0
                 runOnUiThread {
-                    Toast.makeText(this, "Imported $count recording(s)", Toast.LENGTH_LONG).show()
-                    loadFiles()
+                    if (count > 0) {
+                        Toast.makeText(this, "Imported $count recording(s)", Toast.LENGTH_LONG).show()
+                        loadFiles()
+                    } else {
+                        Toast.makeText(this, "No FFTT recordings found in that file", Toast.LENGTH_LONG).show()
+                    }
                 }
             } catch (e: Throwable) {
                 runOnUiThread { Toast.makeText(this, "Import failed: ${e.message}", Toast.LENGTH_LONG).show() }
             }
         }
+    }
+
+    /** Handle a shared bundle opened from outside the app (Quick Share / Files → "open with FFTT"). */
+    private fun handleViewIntent(intent: Intent?) {
+        if (intent?.action == Intent.ACTION_VIEW) intent.data?.let { importFromUri(it) }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleViewIntent(intent)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -69,6 +90,7 @@ class GalleryActivity : AppCompatActivity() {
         updateLayoutManager()
 
         loadFiles()
+        handleViewIntent(intent)   // a shared bundle may have launched us
 
         btnViewToggle.setOnClickListener {
             isGridView = !isGridView
@@ -132,7 +154,9 @@ class GalleryActivity : AppCompatActivity() {
             try {
                 val dir = File(cacheDir, "share").apply { mkdirs() }
                 dir.listFiles()?.forEach { it.delete() }   // keep only the latest
-                val f = File(dir, "FFTT_gallery_${System.currentTimeMillis()}.fftt")
+                // .zip extension: receivers recognise it (no "open with Wallet"), and FFTT
+                // registers as a handler so tapping the received file imports it.
+                val f = File(dir, "FFTT_gallery_${System.currentTimeMillis()}.zip")
                 f.outputStream().use { GalleryTransfer.buildBundle(this, wavs, it) }
                 val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", f)
                 runOnUiThread {
