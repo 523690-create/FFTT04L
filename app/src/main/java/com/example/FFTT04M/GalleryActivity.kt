@@ -17,6 +17,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import java.net.Socket
+import kotlin.concurrent.thread
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -29,9 +30,9 @@ class GalleryActivity : AppCompatActivity() {
     private var isGridView = false
     private var files = mutableListOf<File>()
 
-    // Scanner result (sender side): the scanned handshake string -> connect and stream the bundle.
+    // Scanner result (receiver side): scanned the donor's QR -> connect and pull the bundle.
     private val scanLauncher = registerForActivityResult(ScanContract()) { result ->
-        result.contents?.let { sendBundleTo(it) }
+        result.contents?.let { receiveBundleFrom(it) }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -64,7 +65,7 @@ class GalleryActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnShare).setOnClickListener { showShareDialog() }
     }
 
-    /** SHARE → choose Send (scan the other device's QR) or Receive (show this device's QR). */
+    /** SHARE → Send (show this device's QR; it streams its gallery) or Receive (scan the donor's QR). */
     private fun showShareDialog() {
         AlertDialog.Builder(this)
             .setTitle("Share gallery")
@@ -74,22 +75,23 @@ class GalleryActivity : AppCompatActivity() {
                         Toast.makeText(this, "No recordings to send", Toast.LENGTH_SHORT).show()
                         return@setItems
                     }
+                    startActivity(Intent(this, ExportActivity::class.java))   // shows QR, streams on connect
+                } else {
                     scanLauncher.launch(ScanOptions().apply {
                         setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-                        setPrompt("Scan the QR shown on the receiving device")
+                        setPrompt("Scan the QR shown on the SENDING device")
                         setBeepEnabled(false)
                         setOrientationLocked(false)
                     })
-                } else {
-                    startActivity(Intent(this, ImportActivity::class.java))
                 }
             }
             .setNegativeButton("Cancel", null)
             .show()
     }
 
-    /** Sender: parse the handshake (FFTT1:ip:port:token), connect, and stream the gallery bundle. */
-    private fun sendBundleTo(handshake: String) {
+    /** Receiver: parse the donor's handshake (FFTT1:ip:port:token), connect, send the token, and
+     *  pull the gallery bundle. */
+    private fun receiveBundleFrom(handshake: String) {
         val parts = handshake.split(":")
         if (parts.size != 4 || parts[0] != GalleryTransfer.HANDSHAKE_PREFIX) {
             Toast.makeText(this, "Not an FFTT transfer code", Toast.LENGTH_SHORT).show()
@@ -98,20 +100,21 @@ class GalleryActivity : AppCompatActivity() {
         val ip = parts[1]
         val port = parts[2].toIntOrNull() ?: return
         val token = parts[3]
-        val wavs = GalleryTransfer.recordingWavs(this)
-        Toast.makeText(this, "Sending ${wavs.size} recording(s)…", Toast.LENGTH_SHORT).show()
-        Thread {
+        Toast.makeText(this, "Receiving…", Toast.LENGTH_SHORT).show()
+        thread {
             try {
                 Socket(ip, port).use { sock ->
-                    val out = sock.getOutputStream()
-                    out.write("$token\n".toByteArray())
-                    GalleryTransfer.buildBundle(this, wavs, out)
+                    sock.getOutputStream().apply { write("$token\n".toByteArray()); flush() }
+                    val count = GalleryTransfer.importBundle(this, sock.getInputStream())
+                    runOnUiThread {
+                        Toast.makeText(this, "Imported $count recording(s)", Toast.LENGTH_LONG).show()
+                        loadFiles()
+                    }
                 }
-                runOnUiThread { Toast.makeText(this, "Sent ${wavs.size} recording(s)", Toast.LENGTH_LONG).show() }
-            } catch (e: Exception) {
-                runOnUiThread { Toast.makeText(this, "Send failed: ${e.message}", Toast.LENGTH_LONG).show() }
+            } catch (e: Throwable) {
+                runOnUiThread { Toast.makeText(this, "Receive failed: ${e.message}", Toast.LENGTH_LONG).show() }
             }
-        }.start()
+        }
     }
 
     override fun onResume() {

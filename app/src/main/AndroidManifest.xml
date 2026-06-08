@@ -60,9 +60,9 @@
             android:screenOrientation="fullSensor" />
 
         <activity
-            android:name=".ImportActivity"
+            android:name=".ExportActivity"
             android:exported="false"
-            android:label="Receive gallery"
+            android:label="Send gallery"
             android:screenOrientation="fullSensor" />
 
     </application>

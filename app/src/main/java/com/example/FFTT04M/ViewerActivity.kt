@@ -954,8 +954,14 @@ class ViewerActivity : AppCompatActivity() {
                 }
             } catch (e: InterruptedException) {
                 // Task cancelled
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
+                // Throwable (incl. OutOfMemoryError): heavy settings (large FFT / CWT / high level)
+                // from a shared recording may exceed this device. Fail gracefully, don't crash.
                 e.printStackTrace()
+                runOnUiThread {
+                    if (!isFinishing && !isDestroyed)
+                        Toast.makeText(this, "This view is too heavy for this device", Toast.LENGTH_LONG).show()
+                }
             } finally {
                 endBusy()
                 synchronized(refreshLock) {
@@ -1053,8 +1059,14 @@ class ViewerActivity : AppCompatActivity() {
                     decodeViaMediaCodec(file)
                 }
                 runOnUiThread { triggerRefresh() }
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
+                // Throwable (incl. OutOfMemoryError): a shared recording's settings may exceed this
+                // device. Fail gracefully instead of crashing.
                 e.printStackTrace()
+                runOnUiThread {
+                    if (!isFinishing && !isDestroyed)
+                        Toast.makeText(this, "Couldn't open this recording on this device: ${e.message}", Toast.LENGTH_LONG).show()
+                }
             } finally {
                 endBusy()
             }
