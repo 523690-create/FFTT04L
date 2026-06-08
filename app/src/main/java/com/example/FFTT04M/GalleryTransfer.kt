@@ -171,9 +171,12 @@ object GalleryTransfer {
                                 onImported?.invoke(imported, base)
                             }
                         }
-                        dup -> { }                                  // already have it: skip sidecars
+                        // Comment is the critical metadata: always sync it, even onto a recording the
+                        // receiver already has (so a comment added/edited after a prior transfer arrives).
+                        ext == "txt" -> File(dir, "$base.txt").outputStream().use { zip.copyTo(it) }
+                        dup -> { }                                  // already have the recording: skip png/json
                         ext == "json" -> if (applyMeta) pendingMeta.add(base to zip.readBytes().toString(Charsets.UTF_8))
-                        else -> File(dir, "$base.$ext").outputStream().use { zip.copyTo(it) }  // .png, .txt (comment)
+                        else -> File(dir, "$base.$ext").outputStream().use { zip.copyTo(it) }  // .png thumbnail
                     }
                 }
                 zip.closeEntry()
