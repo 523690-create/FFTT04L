@@ -122,9 +122,9 @@ Two devices running this app can transfer recordings — **with all their analys
 comments, and thumbnails** — directly over Wi-Fi, no internet or account needed.
 
 1. Put **both devices on the same Wi-Fi network**.
-2. On the **receiving** device: **Gallery → SHARE → Receive onto this device**. A QR code appears.
-3. On the **sending** device: **Gallery → SHARE → Send to another device**, then point the
-   camera at the other device's QR code.
+2. On the **sending** device: **Gallery → SHARE → Send via QR**. A QR code appears.
+3. On the **receiving** device: **Gallery → SHARE → Receive via QR**, then point the camera at
+   the sending device's QR code.
 4. The whole gallery transfers; imported recordings keep their own colour/analysis settings.
    Name clashes are auto-renamed (e.g. `…_imp`), so nothing is overwritten.
 
