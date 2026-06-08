@@ -644,3 +644,32 @@ complete (Anisotropic/Gabor/Frangi cover the space).
 5. tell me what you think about this idea: put a "PROCESSED PLAYBACK" button in the DISPLAY tab under the COLOR control; have it look at the data array you used to render the display, run a reverse FFT on it (effectively regenerating an audio file) and play that back. (it may produce unexpected results in reassignment and synchrosqueeze modes but would like to play with taht too.) (no neeed to do that in wavelet right now but tell me if you think that would be workable.)
 6. I think even on smaller screens there is room for another control in DISPLAY tab? I would like to take vertical lines out of BLUR and give them their own control, a multi-pick (like enhancement stack) that includes: 2dp thick vertical lines every second, 1dp lines every 100 msec, and CLEAR if none.
 7. 
+
+---
+
+## FUTURE VISION — DO NOT TOUCH UNTIL PROMPTED
+
+> This section is a forward-looking roadmap only. **Do not design, implement, or modify anything
+> here unless the user explicitly asks.** It exists so the intent isn't lost.
+
+### Context
+The current push for downward compatibility (API 23 / Nexus 7 / AOSP tablets) is **deliberate
+stress-testing** — exercising old/low-end hardware to surface weak points. The product will
+**ship to more modern devices for beta testing**; legacy support is a robustness exercise, not
+the shipping target.
+
+### Possible future "fully modern" edition
+A later, modern-only version may raise the analysis ceiling well beyond today's limits:
+- **96 kHz** sample rate (vs current 44.1 kHz).
+- **FFT size up to 8192** (vs current smaller sizes).
+- **High-fidelity FLAC** capture (vs the current 16-bit PCM WAV; note the old FLAC container
+  attempt was abandoned — a proper modern encoder/muxer would be needed).
+- **Automatic recording capture** (hands-free triggering, vs today's manual freeze-and-crop).
+
+### Domain (the actual subject)
+What the app captures and maps is **cough**. Plausible future functionality:
+- **Auto-capture of cough-like events** (detect and record sounds resembling a cough).
+- **Speech rejection** (suppress/ignore speech so it isn't captured or mistaken for a cough).
+
+These are research-grade features (event detection + classification) and would pair naturally
+with the higher sample rate / FFT size and auto-capture above.
