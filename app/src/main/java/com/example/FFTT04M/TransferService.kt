@@ -35,7 +35,11 @@ class TransferService : Service() {
         private const val NID_PROGRESS = 4100
         private const val NID_FILE_BASE = 4200
         private const val TAG = "FFTTxfer"
+        /** Broadcast (per imported clip + on completion) so a visible Gallery can auto-refresh. */
+        const val ACTION_PROGRESS = "com.example.FFTT04M.TRANSFER_PROGRESS"
     }
+
+    private fun broadcastProgress() = sendBroadcast(Intent(ACTION_PROGRESS).setPackage(packageName))
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -71,6 +75,7 @@ class TransferService : Service() {
             fileCount = n
             notify(NID_FILE_BASE + (n % 50), file("Imported recording", prettyName(name)))
             notify(NID_PROGRESS, progress("Receiving gallery…", "$n imported so far", ongoing = true))
+            broadcastProgress()   // refresh an open Gallery after each clip
         }
 
         val res: GalleryTransfer.ImportResult = when (transport) {
@@ -105,6 +110,7 @@ class TransferService : Service() {
             if (res.skipped > 0) append(", skipped ${res.skipped} already present")
         }
         notify(NID_PROGRESS, progress("Gallery received", summary, ongoing = false))
+        broadcastProgress()   // final refresh (also picks up comment-only updates)
     }
 
     // ---- notifications --------------------------------------------------------------------------

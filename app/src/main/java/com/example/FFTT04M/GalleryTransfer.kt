@@ -61,17 +61,18 @@ object GalleryTransfer {
     // ---- Negotiated transfer (transport-agnostic: Bluetooth RFCOMM or a TCP socket) -------------
     // Wire protocol once a stream pair is connected:
     //   receiver → sender:  "<token>\n"  then  "<csv of existing base names>\n"
-    //   sender   → receiver: a ZIP bundle of ONLY the recordings the receiver doesn't have, to EOF.
+    //   sender   → receiver: a ZIP bundle — full package for recordings the receiver lacks, plus the
+    //                        comment (.txt) ONLY for recordings it already has (so comments sync), EOF.
 
-    /** Sender side: verify the token, read the receiver's existing names, stream only the missing
-     *  recordings. Returns how many were sent (or -1 on token mismatch). */
+    /** Sender side: verify the token, read the receiver's existing names, stream the bundle.
+     *  Returns how many NEW recordings were sent (or -1 on token mismatch). */
     fun sendNegotiated(ctx: Context, inp: InputStream, out: OutputStream, expectedToken: String): Int {
         if (readLine(inp) != expectedToken) return -1
         val have = readLine(inp).split(",").filter { it.isNotEmpty() }.toHashSet()
-        val missing = recordingWavs(ctx).filter { it.nameWithoutExtension !in have }
-        buildBundle(ctx, missing, out)
+        val all = recordingWavs(ctx)
+        buildBundle(ctx, all, out, commentOnlyFor = have)
         out.flush()
-        return missing.size
+        return all.count { it.nameWithoutExtension !in have }
     }
 
     /** Receiver side: send the token + our existing names, then import the streamed bundle. */
@@ -85,7 +86,9 @@ object GalleryTransfer {
 
     // ---- Export ---------------------------------------------------------------------------------
 
-    fun buildBundle(ctx: Context, wavs: List<File>, out: OutputStream) {
+    /** Build a transfer bundle. For recordings whose base name is in [commentOnlyFor] (the receiver
+     *  already has them) only the comment .txt is included, so comments sync without re-sending audio. */
+    fun buildBundle(ctx: Context, wavs: List<File>, out: OutputStream, commentOnlyFor: Set<String> = emptySet()) {
         ZipOutputStream(BufferedOutputStream(out)).use { zip ->
             val manifest = JSONObject()
                 .put("app", "FFTT04M").put("schema", 1).put("count", wavs.size)
@@ -93,6 +96,11 @@ object GalleryTransfer {
 
             for (wav in wavs) {
                 val base = wav.nameWithoutExtension
+                if (base in commentOnlyFor) {
+                    // Receiver already has this recording — send only the comment so edits propagate.
+                    File(wav.parentFile, "$base.txt").takeIf { it.exists() }?.let { addFile(zip, it) }
+                    continue
+                }
                 addFile(zip, wav)
                 File(wav.parentFile, "$base.png").takeIf { it.exists() }?.let { addFile(zip, it) }
                 File(wav.parentFile, "$base.txt").takeIf { it.exists() }?.let { addFile(zip, it) }

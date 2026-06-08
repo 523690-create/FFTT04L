@@ -4,7 +4,10 @@ import android.Manifest
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -285,6 +288,24 @@ class GalleryActivity : AppCompatActivity() {
         // A comment edit in the Viewer can change the sidecar .txt and the .png thumbnail; reload so
         // those changes (and any newly recorded files) show without leaving the gallery.
         loadFiles()
+    }
+
+    // Live-refresh the grid as a background transfer imports each clip (TransferService broadcasts).
+    private val importProgressReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) { loadFiles() }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        ContextCompat.registerReceiver(
+            this, importProgressReceiver, IntentFilter(TransferService.ACTION_PROGRESS),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+    }
+
+    override fun onStop() {
+        super.onStop()
+        runCatching { unregisterReceiver(importProgressReceiver) }
     }
 
     private fun loadFiles() {
