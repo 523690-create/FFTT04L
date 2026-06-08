@@ -51,9 +51,10 @@ Detailed FFT spectrogram of a saved recording, with three tabs:
 Top bar: **GALLERY**, **LISTEN**, **WAVELET** (analysis of the same file), **NOTE**
 (add a comment / refresh the thumbnail), **PLAY** (raw audio playback).
 
-- **PROCESSED PLAYBACK** plays the recording with the **EQ + noise filter applied** (vs. the
-  raw PLAY button). Image-only enhancements (Gabor/Frangi/reassignment/etc.) aren't part of it.
-  Experimental.
+- **PROCESSED PLAYBACK** plays the recording **as you see it** — EQ, FILTER, and the ENHANCE
+  post-processors are all applied to the sound (reconstructed from the displayed spectrogram with
+  the original phase). The *engine* modes (Reassignment/Synchrosqueeze/Constant-Q/Multitaper) and
+  very old/low-memory devices fall back to EQ + filter only. Experimental.
 - **TIME GRID** overlays vertical time markers — **1 s** (thick) and/or **100 ms** (thin);
   multi-select, with Clear. Independent of BLUR.
 
@@ -128,6 +129,11 @@ comments, and thumbnails** — directly over Wi-Fi, no internet or account neede
    Name clashes are auto-renamed (e.g. `…_imp`), so nothing is overwritten.
 
 The QR code only carries the connection handshake; the audio itself streams over Wi-Fi.
+
+**On different networks (mobile data, different Wi-Fi)?** Use **SHARE → Export / share to
+file…** on the sending device — it packages the gallery into a `.fftt` file and opens the
+system share sheet (Quick Share, Bluetooth, email, Drive, …), which works across any network.
+On the other device, **SHARE → Import from file…** and pick the `.fftt`.
 
 ## Tips
 
