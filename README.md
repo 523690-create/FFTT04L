@@ -44,7 +44,8 @@ The home screen shows the live microphone spectrogram (frequency vs. time, colou
 - **COLOR** opens the colour-scheme picker (see *Colour schemes*). In Listen mode your
   choice is global and remembered across sessions.
 - **GALLERY** opens saved recordings. **LATENCY** helps measure audio round-trip delay.
-- The EQ sliders (100 Hz … 8 kHz) shape what you hear during live monitoring.
+- The EQ sliders (100 Hz … 8 kHz) shape **only the waterfall display** — the recording you
+  save and play back is always the **raw, unprocessed mic feed**.
 
 ### Gallery
 A grid/list of saved recordings, each with a thumbnail and filename.
@@ -57,12 +58,20 @@ A grid/list of saved recordings, each with a thumbnail and filename.
 ### FFT analysis (Viewer)
 Detailed FFT spectrogram of a saved recording, with three tabs:
 
-- **EQ** — per-band gain sliders.
+- **EQ** — per-band gain sliders (display-only, like Listen).
 - **FILTER** — noise filter %, plus attack (Rise) and release (Fall) times.
-- **DISPLAY** — FFT **Size** and **Step** (overlap), **ENHANCE**, and **COLOR**.
+- **DISPLAY** — FFT **Size** and **Step** (overlap), **ENHANCE**, **COLOR**, **PROCESSED
+  PLAYBACK**, and **TIME GRID**.
 
 Top bar: **GALLERY**, **LISTEN**, **WAVELET** (analysis of the same file), **NOTE**
-(add a comment / refresh the thumbnail), **PLAY** (audio playback).
+(add a comment / refresh the thumbnail), **PLAY** (raw audio playback).
+
+- **PROCESSED PLAYBACK** plays the recording **as you see it** — EQ, FILTER, and the ENHANCE
+  post-processors are all applied to the sound (reconstructed from the displayed spectrogram with
+  the original phase). The *engine* modes (Reassignment/Synchrosqueeze/Constant-Q/Multitaper) and
+  very old/low-memory devices fall back to EQ + filter only. Experimental.
+- **TIME GRID** overlays vertical time markers — **1 s** (thick) and/or **100 ms** (thin);
+  multi-select, with Clear. Independent of BLUR.
 
 In analysis screens the colour choice is **tied to the recording**, so each recording
 remembers its own scheme. The first time, it inherits your last-used (global) scheme.
@@ -135,6 +144,11 @@ comments, and thumbnails** — directly over Wi-Fi, no internet or account neede
    Name clashes are auto-renamed (e.g. `…_imp`), so nothing is overwritten.
 
 The QR code only carries the connection handshake; the audio itself streams over Wi-Fi.
+
+**On different networks (mobile data, different Wi-Fi)?** Use **SHARE → Export / share to
+file…** on the sending device — it packages the gallery into a `.fftt` file and opens the
+system share sheet (Quick Share, Bluetooth, email, Drive, …), which works across any network.
+On the other device, **SHARE → Import from file…** and pick the `.fftt`.
 
 ## Tips
 
