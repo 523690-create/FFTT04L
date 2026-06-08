@@ -34,6 +34,7 @@ class TransferService : Service() {
         private const val CH_FILES = "fftt_transfer_files"
         private const val NID_PROGRESS = 4100
         private const val NID_FILE_BASE = 4200
+        private const val TAG = "FFTTxfer"
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -41,12 +42,20 @@ class TransferService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         createChannels()
         val transport = intent?.getStringExtra(EX_TRANSPORT) ?: run { stopSelf(); return START_NOT_STICKY }
-        startForegroundCompat(transport, "Receiving gallery…")
+        android.util.Log.i(TAG, "onStartCommand transport=$transport")
+        // Try to run in the foreground; if the OS rejects the FGS (type/permission rules on newer
+        // Android), don't die — log it and still run the transfer on a plain thread.
+        try {
+            startForegroundCompat(transport, "Receiving gallery…")
+        } catch (e: Throwable) {
+            android.util.Log.e(TAG, "startForeground failed; running without FGS", e)
+        }
         thread {
             try {
                 runReceive(intent, transport)
             } catch (e: Throwable) {
-                notify(NID_PROGRESS, progress("Transfer failed", e.message ?: "", ongoing = false))
+                android.util.Log.e(TAG, "receive failed", e)
+                notify(NID_PROGRESS, progress("Transfer failed", e.message ?: e.javaClass.simpleName, ongoing = false))
             } finally {
                 stopForegroundCompat()
                 stopSelf()
@@ -69,20 +78,25 @@ class TransferService : Service() {
                 val addr = intent.getStringExtra(EX_BT_ADDR) ?: return
                 val adapter = (getSystemService(BluetoothManager::class.java))?.adapter ?: return
                 adapter.cancelDiscovery()
+                android.util.Log.i(TAG, "bt connecting to $addr")
                 adapter.getRemoteDevice(addr).createRfcommSocketToServiceRecord(GalleryTransfer.BT_UUID).use { sock ->
                     sock.connect()
+                    android.util.Log.i(TAG, "bt connected")
                     GalleryTransfer.receiveNegotiated(this, sock.inputStream, sock.outputStream, token, onImported)
                 }
             }
             else -> {
                 val ip = intent.getStringExtra(EX_IP) ?: return
                 val port = intent.getIntExtra(EX_PORT, -1)
+                android.util.Log.i(TAG, "wifi connecting to $ip:$port")
                 Socket().use { sock ->
                     sock.connect(InetSocketAddress(ip, port), 8000)
+                    android.util.Log.i(TAG, "wifi connected")
                     GalleryTransfer.receiveNegotiated(this, sock.inputStream, sock.outputStream, token, onImported)
                 }
             }
         }
+        android.util.Log.i(TAG, "done imported=${res.imported} skipped=${res.skipped}")
 
         val summary = buildString {
             append("Imported ${res.imported}")

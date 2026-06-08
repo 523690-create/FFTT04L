@@ -85,10 +85,13 @@ class BtSendActivity : AppCompatActivity() {
         status.text = "On the receiving device:\nGallery → SHARE → Receive (scan QR), then scan this code.\n\n" +
             "Bluetooth name: $btName\n(The two devices must already be paired in Bluetooth settings.)"
 
+        android.util.Log.i("FFTTxfer", "BT serving as '$btName' token=$token, waiting for connection")
         thread {
             try {
                 srv.accept().use { sock ->
+                    android.util.Log.i("FFTTxfer", "BT accepted connection")
                     val sent = GalleryTransfer.sendNegotiated(this, sock.inputStream, sock.outputStream, token)
+                    android.util.Log.i("FFTTxfer", "BT sendNegotiated returned $sent")
                     done = true
                     runOnUiThread {
                         toast(if (sent < 0) "Handshake mismatch" else "Sent $sent recording(s)")

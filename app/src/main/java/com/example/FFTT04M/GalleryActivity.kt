@@ -61,6 +61,7 @@ class GalleryActivity : AppCompatActivity() {
     }
 
     private fun handleScanned(s: String) {
+        android.util.Log.i("FFTTxfer", "scanned prefix=${s.substringBefore(':')}")
         when {
             s.startsWith("${GalleryTransfer.HANDSHAKE_PREFIX}:") -> receiveBundleFrom(s)           // Wi-Fi
             s.startsWith("${GalleryTransfer.BT_PREFIX}:") -> {
@@ -79,6 +80,7 @@ class GalleryActivity : AppCompatActivity() {
         if (!adapter.isEnabled) { Toast.makeText(this, "Turn Bluetooth on, then try again", Toast.LENGTH_LONG).show(); return }
         val bonded = try { adapter.bondedDevices } catch (e: SecurityException) { null } ?: emptySet()
         val matches = bonded.filter { (runCatching { it.name }.getOrNull() ?: "") == name }
+        android.util.Log.i("FFTTxfer", "bt receive: looking for '$name', bonded matches=${matches.size} of ${bonded.size}")
         when {
             matches.isEmpty() -> Toast.makeText(this,
                 "Pair \"$name\" in Bluetooth settings first, then scan again", Toast.LENGTH_LONG).show()
@@ -108,6 +110,7 @@ class GalleryActivity : AppCompatActivity() {
 
     private fun startReceiveService(extras: Intent.() -> Unit) {
         val launch = {
+            android.util.Log.i("FFTTxfer", "startReceiveService")
             ContextCompat.startForegroundService(this, Intent(this, TransferService::class.java).apply(extras))
             Toast.makeText(this, "Receiving in the background — watch your notifications", Toast.LENGTH_LONG).show()
         }
