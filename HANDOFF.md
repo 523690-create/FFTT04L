@@ -4,6 +4,8 @@ Read this file first, then continue the work. This captures context that is NOT 
 codebase or the other .md files — it lives only in the chat session that produced it.
 Date: 2026-06-05.
 
+- ✅ **Gallery Transfer Comment Sync Fix** (`HEAD`): Fixed a logic error in `GalleryTransfer.importBundle()` where `.txt` and `.png` files were skipped on modern devices if the audio recording was already present. Now, critical metadata (comments/thumbnails) always syncs, ensuring that edits made after a prior transfer are propagated correctly.
+
 ## COMPLETED IN THIS SESSION (2026-06-05) — verified end-to-end on Nexus 7 (API 23)
 - ✅ **FLAC removed, WAV-only** (`a31505e`): 16-bit PCM WAV everywhere; dropped the invalid FLAC container.
 - ✅ **REAL root cause of "empty Gallery" found & fixed** (`4fab9d7`): GalleryActivity only
@@ -146,6 +148,8 @@ ALWAYS: build with gradlew before claiming done; uninstall on devices before ins
 commit + push each green change as its own commit; keep this HANDOFF.md updated at end of session.
 
 ---
+
+- ✅ **Gallery Transfer Comment Sync Fix** (`HEAD`): Fixed a logic error in `GalleryTransfer.importBundle()` where `.txt` and `.png` files were skipped on modern devices if the audio recording was already present. Now, critical metadata (comments/thumbnails) always syncs, ensuring that edits made after a prior transfer are propagated correctly.
 
 ## COMPLETED IN THIS SESSION (2026-06-05) — verified end-to-end on Nexus 7 (API 23)
 
