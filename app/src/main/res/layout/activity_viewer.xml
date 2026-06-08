@@ -342,6 +342,23 @@
                 android:insetBottom="0dp"
                 style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
 
+            <!-- TIME GRID: multi-pick overlay (1 s thick / 100 ms thin), independent of BLUR -->
+            <Button
+                android:id="@+id/btnViewerGrid"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="0.11"
+                android:layout_marginBottom="2dp"
+                android:text="TIME GRID"
+                android:backgroundTint="#9C27B0"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:minWidth="0dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
+
             <Spinner
                 android:id="@+id/vEnhanceSpinner"
                 android:layout_width="match_parent"
@@ -353,7 +370,7 @@
             <View
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
-                android:layout_weight="0.23" />
+                android:layout_weight="0.12" />
 
         </LinearLayout>
 

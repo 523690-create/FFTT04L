@@ -41,6 +41,7 @@ class ViewerActivity : AppCompatActivity() {
     private lateinit var sizeSpinner: Spinner
     private lateinit var stepSpinner: Spinner
     private lateinit var btnColor: Button
+    private lateinit var btnGrid: Button
     private lateinit var blurSpinner: Spinner
     private lateinit var btnSweep: Button
     private var viewerProgress: android.widget.ProgressBar? = null
@@ -209,6 +210,7 @@ class ViewerActivity : AppCompatActivity() {
         sizeSpinner = findViewById(R.id.vSizeSpinner)
         stepSpinner = findViewById(R.id.vStepSpinner)
         btnColor = findViewById(R.id.btnViewerColor)
+        btnGrid = findViewById(R.id.btnViewerGrid)
         blurSpinner = findViewById(R.id.vBlurSpinner)
         // enhanceSpinner is redundant (hidden in layout); logic moved to Enhance button.
         btnSweep = findViewById(R.id.btnViewerSweep)
@@ -243,6 +245,7 @@ class ViewerActivity : AppCompatActivity() {
         // Controls now exist in both orientations (landscape uses the same tabbed sidebar), so the
         // full control set is wired regardless of orientation.
         setupColorSpinner()
+        setupGridButton()
         setupNoiseFilter()
         setupBlurSpinner()
         setupEnhanceButton()
@@ -304,6 +307,47 @@ class ViewerActivity : AppCompatActivity() {
         btnColor.text = "COLOR"
         btnColor.backgroundTintList = android.content.res.ColorStateList.valueOf(viewerFft.highColorFor(idx))
         btnColor.setTextColor(viewerFft.lowColorFor(idx))
+    }
+
+    // Time-grid overlay: bit0 = 1 s thick lines, bit1 = 100 ms thin lines. Persisted per recording.
+    private fun setupGridButton() {
+        val mask = prefs.getInt("time_grid_mask", 0)
+        viewerFft.setTimeGrid(mask)
+        updateGridButton(mask)
+        btnGrid.setOnClickListener { showGridDialog() }
+    }
+
+    private fun updateGridButton(mask: Int) {
+        val labels = buildList {
+            if (mask and 1 != 0) add("1s")
+            if (mask and 2 != 0) add("100ms")
+        }
+        btnGrid.text = if (labels.isEmpty()) "TIME GRID" else "GRID: " + labels.joinToString("+")
+    }
+
+    private fun showGridDialog() {
+        val current = prefs.getInt("time_grid_mask", 0)
+        val checked = booleanArrayOf(current and 1 != 0, current and 2 != 0)
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Time grid")
+            .setMultiChoiceItems(
+                arrayOf("1 s lines (thick)", "100 ms lines (thin)"), checked
+            ) { _, which, isChecked -> checked[which] = isChecked }
+            .setPositiveButton("Apply") { _, _ ->
+                var mask = 0
+                if (checked[0]) mask = mask or 1
+                if (checked[1]) mask = mask or 2
+                prefs.edit { putInt("time_grid_mask", mask) }
+                viewerFft.setTimeGrid(mask)
+                updateGridButton(mask)
+            }
+            .setNeutralButton("Clear") { _, _ ->
+                prefs.edit { putInt("time_grid_mask", 0) }
+                viewerFft.setTimeGrid(0)
+                updateGridButton(0)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
 

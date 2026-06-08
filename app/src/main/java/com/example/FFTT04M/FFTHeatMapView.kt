@@ -49,6 +49,23 @@ class FFTHeatMapView @JvmOverloads constructor(
         strokeWidth = 3f
         isAntiAlias = true
     }
+
+    // Time-grid overlay (decoupled from blur). Bit 0 = thick 1 s lines, bit 1 = thin 100 ms lines.
+    private val gridDensity = resources.displayMetrics.density
+    private val gridThickPaint = Paint().apply {
+        color = Color.argb(200, 255, 255, 255); strokeWidth = 2f * gridDensity; style = Paint.Style.STROKE
+    }
+    private val gridThinPaint = Paint().apply {
+        color = Color.argb(130, 255, 255, 255); strokeWidth = 1f * gridDensity; style = Paint.Style.STROKE
+    }
+    private var timeGridMask = 0
+
+    /** Set the time-grid overlay: bit0 = 1 s thick lines, bit1 = 100 ms thin lines, 0 = off. */
+    fun setTimeGrid(mask: Int) {
+        timeGridMask = mask
+        invalidate()
+    }
+
     var isFrozen = false
     private var isEngineActive = false
 
@@ -377,23 +394,25 @@ class FFTHeatMapView @JvmOverloads constructor(
         }
         canvas.restore()
 
-        // Borrowed from FFTT02M: when blur is active, overlay vertical time-grid lines every 250 ms.
-        // Transformed by the same pan/zoom as the spectrogram so the lines track the time axis
-        // under pinch/zoom (offsetX/zoomFactorX horizontally, offsetY/zoomFactorY for the span).
-        if (blurRadius > 0) {
+        // Time-grid overlay — independent of blur now (bit0 = 1 s thick, bit1 = 100 ms thin).
+        // Lines are transformed by the same pan/zoom as the spectrogram so they track the time axis.
+        if (timeGridMask != 0) {
             val msPerFrame = stepSize.toFloat() / sampleRate * 1000f
             if (msPerFrame > 0f) {
-                val framesPerLine = 250f / msPerFrame
-                if (framesPerLine >= 1f) {
-                    val yTop = offsetY
-                    val yBottom = offsetY + h * zoomFactorY
+                val yTop = offsetY
+                val yBottom = offsetY + h * zoomFactorY
+                fun drawEvery(intervalMs: Float, paint: Paint) {
+                    val framesPerLine = intervalMs / msPerFrame
+                    if (framesPerLine < 1f) return          // would be denser than 1 px/column
                     var frame = framesPerLine
                     while (frame < maxHistory) {
                         val x = offsetX + (frame / maxHistory) * w * zoomFactorX
-                        if (x in 0f..w) canvas.drawLine(x, yTop, x, yBottom, linePaint)
+                        if (x in 0f..w) canvas.drawLine(x, yTop, x, yBottom, paint)
                         frame += framesPerLine
                     }
                 }
+                if (timeGridMask and 2 != 0) drawEvery(100f, gridThinPaint)    // 100 ms (under)
+                if (timeGridMask and 1 != 0) drawEvery(1000f, gridThickPaint)  // 1 s (on top)
             }
         }
 

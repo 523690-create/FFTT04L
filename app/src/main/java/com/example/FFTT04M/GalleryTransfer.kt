@@ -42,8 +42,13 @@ object GalleryTransfer {
         return "rec_" + buildString { for (c in base) append(if (c.isLetterOrDigit()) c else '_') }
     }
 
+    /** Recordings live in the EXTERNAL files dir (same as GalleryActivity/MainActivity) — NOT the
+     *  internal filesDir. Using the wrong one made Send see "no recordings" and Import write to a
+     *  place the Gallery doesn't read. */
+    fun recordingsDir(ctx: Context): File? = ctx.getExternalFilesDir(null)
+
     fun recordingWavs(ctx: Context): List<File> =
-        ctx.filesDir?.listFiles { f -> f.extension == "wav" || f.extension == "flac" }
+        recordingsDir(ctx)?.listFiles { f -> f.extension == "wav" || f.extension == "flac" }
             ?.sortedBy { it.name } ?: emptyList()
 
     // ---- Export ---------------------------------------------------------------------------------
@@ -87,7 +92,7 @@ object GalleryTransfer {
      *  imported. Collisions are de-duplicated by appending _imp / _imp2 … to the whole recording
      *  (file set + prefs namespace stay consistent). */
     fun importBundle(ctx: Context, inp: InputStream): Int {
-        val dir = ctx.filesDir ?: return 0
+        val dir = recordingsDir(ctx) ?: return 0
         val baseMap = HashMap<String, String>()
         val used = HashSet<String>()
         val pendingMeta = ArrayList<Pair<String, String>>()
