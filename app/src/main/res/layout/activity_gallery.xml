@@ -24,16 +24,6 @@
             android:text="@string/title_gallery"
             style="@style/TextHeading" />
 
-        <ImageButton
-            android:id="@+id/btnViewToggle"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:src="@drawable/ic_view_module"
-            android:scaleType="centerInside"
-            android:contentDescription="Toggle View"
-            android:layout_marginEnd="8dp" />
-
         <Button
             android:id="@+id/btnShare"
             android:layout_width="wrap_content"
@@ -68,6 +58,26 @@
             android:textSize="11sp"
             android:textStyle="bold"
             style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
+
+    </LinearLayout>
+
+    <!-- Second row: grid/list toggle right-aligned (under the LISTEN button) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical|end"
+        android:paddingHorizontal="8dp"
+        android:layout_marginBottom="4dp">
+
+        <ImageButton
+            android:id="@+id/btnViewToggle"
+            android:layout_width="48dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_view_module"
+            android:scaleType="centerInside"
+            android:contentDescription="Toggle View" />
 
     </LinearLayout>
 

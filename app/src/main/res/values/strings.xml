@@ -29,7 +29,7 @@
     <string name="label_0pct" formatted="false">0\n%</string>
     <string name="label_0ms">0\nms</string>
     <string name="title_listening">FFT Listening</string>
-    <string name="title_gallery">FFT Gallery</string>
+    <string name="title_gallery">GALLERY</string>
     <string name="title_analysis">FFT</string>
     <string name="title_wavelet">Wavelet Analysis</string>
     <string name="label_blur">BLUR:%1$d</string>
