@@ -143,6 +143,11 @@ object GalleryTransfer {
             File(dir, "$base.wav").exists() || File(dir, "$base.flac").exists()
         }
 
+        // Legacy/low-RAM devices skip the analytic-settings JSON (it's platform-finicky and can ask
+        // a weak device to do something heavy). They still get the audio, thumbnail, and COMMENT —
+        // the only critical metadata. Such recordings just open with this device's default settings.
+        val applyMeta = DeviceCaps.tier(ctx) >= 1
+
         val pendingMeta = ArrayList<Pair<String, String>>()
         var imported = 0
         var skipped = 0
@@ -160,8 +165,9 @@ object GalleryTransfer {
                             if (dup) skipped++
                             else { File(dir, "$base.$ext").outputStream().use { zip.copyTo(it) }; imported++ }
                         }
-                        !dup && ext == "json" -> pendingMeta.add(base to zip.readBytes().toString(Charsets.UTF_8))
-                        !dup -> File(dir, "$base.$ext").outputStream().use { zip.copyTo(it) }
+                        dup -> { }                                  // already have it: skip sidecars
+                        ext == "json" -> if (applyMeta) pendingMeta.add(base to zip.readBytes().toString(Charsets.UTF_8))
+                        else -> File(dir, "$base.$ext").outputStream().use { zip.copyTo(it) }  // .png, .txt (comment)
                     }
                 }
                 zip.closeEntry()
