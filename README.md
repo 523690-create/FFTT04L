@@ -134,21 +134,30 @@ Heavier filters (Gabor, Frangi) are disabled on older/low-memory devices and lab
 ## Sharing recordings between devices
 
 Two devices running this app can transfer recordings — **with all their analysis settings,
-comments, and thumbnails** — directly over Wi-Fi, no internet or account needed.
+comments, and thumbnails** — directly, no internet or account needed. Recordings the receiver
+already has are **skipped** (only the missing ones transfer), so re-sharing is safe.
 
-1. Put **both devices on the same Wi-Fi network**.
-2. On the **receiving** device: **Gallery → SHARE → Receive onto this device**. A QR code appears.
-3. On the **sending** device: **Gallery → SHARE → Send to another device**, then point the
-   camera at the other device's QR code.
-4. The whole gallery transfers; imported recordings keep their own colour/analysis settings.
-   Name clashes are auto-renamed (e.g. `…_imp`), so nothing is overwritten.
+**Bluetooth (most reliable — no Wi-Fi needed):**
+1. **One-time:** pair the two devices in Android's Bluetooth settings.
+2. Sender: **Gallery → SHARE → Send via Bluetooth**. A QR appears.
+3. Receiver: **Gallery → SHARE → Receive (scan QR)**, then scan it. The transfer runs over
+   Bluetooth — works even with no Wi-Fi or on mobile data.
 
-The QR code only carries the connection handshake; the audio itself streams over Wi-Fi.
+**Wi-Fi QR (faster, same network):**
+1. Both devices on the **same Wi-Fi**.
+2. Sender: **SHARE → Send via Wi-Fi QR**. Receiver: **SHARE → Receive (scan QR)**, scan it.
+   (If it times out, the Wi-Fi is likely blocking device-to-device — use Bluetooth or file.)
+
+The QR only carries the connection handshake; the recordings stream over the chosen link.
+**Receiving runs in the background** — once you scan, you can leave the Gallery; a notification
+pops up as each recording arrives, and a final one summarises how many were imported/skipped.
+Tap any of them to return to the Gallery. (Allow the notification permission when asked.)
 
 **On different networks (mobile data, different Wi-Fi)?** Use **SHARE → Export / share to
-file…** on the sending device — it packages the gallery into a `.fftt` file and opens the
-system share sheet (Quick Share, Bluetooth, email, Drive, …), which works across any network.
-On the other device, **SHARE → Import from file…** and pick the `.fftt`.
+file…** on the sending device — it packages the gallery into a `.zip` and opens the system
+share sheet (Quick Share, Bluetooth, email, Drive, …), which works across any network. On the
+receiving device, **tap the received file and choose FFTT** to import it, or use **SHARE →
+Import from file…** and pick it.
 
 ## Tips
 
