@@ -11,6 +11,8 @@ import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.Gravity
 import android.view.View
 import android.widget.ArrayAdapter
@@ -34,6 +36,11 @@ class BluetoothPairingActivity : AppCompatActivity() {
     private lateinit var statusText: TextView
     private lateinit var progressBar: ProgressBar
 
+    private val mainHandler = Handler(Looper.getMainLooper())
+    // Safety net: discovery should end in ~12s via ACTION_DISCOVERY_FINISHED, but on some devices that
+    // broadcast never arrives — so we stop the spinner ourselves rather than spin forever.
+    private val discoveryTimeout = Runnable { finishDiscovery(timedOut = true) }
+
     private val permLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) startDiscovery() else {
             Toast.makeText(this, "Bluetooth permission is needed to discover devices", Toast.LENGTH_LONG).show()
@@ -54,11 +61,7 @@ class BluetoothPairingActivity : AppCompatActivity() {
                         updateDeviceList()
                     }
                 }
-                BluetoothAdapter.ACTION_DISCOVERY_FINISHED -> {
-                    isDiscovering = false
-                    progressBar.visibility = View.GONE
-                    statusText.text = "Discovery complete. Found ${discoveredDevices.size} device(s)."
-                }
+                BluetoothAdapter.ACTION_DISCOVERY_FINISHED -> finishDiscovery(timedOut = false)
                 BluetoothDevice.ACTION_BOND_STATE_CHANGED -> {
                     val device: BluetoothDevice? = if (Build.VERSION.SDK_INT >= 33)
                         intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
@@ -140,19 +143,33 @@ class BluetoothPairingActivity : AppCompatActivity() {
         adapter = (getSystemService(BluetoothManager::class.java))?.adapter
         statusText.text = if (adapter == null) "No Bluetooth on this device" else "Requesting permission…"
 
-        registerReceiver(discoveryReceiver, IntentFilter().apply {
+        val filter = IntentFilter().apply {
             addAction(BluetoothDevice.ACTION_FOUND)
             addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED)
             addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED)
-        }, if (Build.VERSION.SDK_INT >= 34) Context.RECEIVER_EXPORTED else 0)
+        }
+        // The 3-arg registerReceiver(receiver, filter, flags) is API 26+, and the flags arg is only
+        // REQUIRED on API 33+. Calling it on API 23 (e.g. the J7) throws NoSuchMethodError and crashes
+        // the scan, so fall back to the 2-arg form below 33.
+        if (Build.VERSION.SDK_INT >= 33) {
+            registerReceiver(discoveryReceiver, filter, Context.RECEIVER_EXPORTED)
+        } else {
+            @Suppress("UnspecifiedRegisterReceiverFlag")
+            registerReceiver(discoveryReceiver, filter)
+        }
 
         requestScanPermissionAndStart()
     }
 
     private fun requestScanPermissionAndStart() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-            ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
-            permLauncher.launch(Manifest.permission.BLUETOOTH_SCAN)
+        // API 31+ gates discovery on BLUETOOTH_SCAN; below that it needs location to receive
+        // ACTION_FOUND results at all (otherwise the scan silently finds 0 devices).
+        val needed = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+            Manifest.permission.BLUETOOTH_SCAN
+        else
+            Manifest.permission.ACCESS_FINE_LOCATION
+        if (ContextCompat.checkSelfPermission(this, needed) != PackageManager.PERMISSION_GRANTED) {
+            permLauncher.launch(needed)
         } else {
             startDiscovery()
         }
@@ -165,14 +182,44 @@ class BluetoothPairingActivity : AppCompatActivity() {
             return
         }
         discoveredDevices.clear()
-        isDiscovering = true
-        progressBar.visibility = View.VISIBLE
-        statusText.text = "Scanning for Bluetooth devices…"
-        try {
+        updateDeviceList()
+        // A scan already in progress makes startDiscovery() return false; cancel it first.
+        try { if (a.isDiscovering) a.cancelDiscovery() } catch (_: SecurityException) {}
+
+        val started = try {
             a.startDiscovery()
         } catch (e: SecurityException) {
             Toast.makeText(this, "Bluetooth error: ${e.message}", Toast.LENGTH_LONG).show()
+            false
         }
+        if (!started) {
+            // No spinner-forever: tell the user why and bail. Pre-31 this is usually Location being off.
+            isDiscovering = false
+            progressBar.visibility = View.GONE
+            statusText.text = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S)
+                "Couldn't start scanning. Turn on Location (required for Bluetooth scan on this Android), then tap Scan."
+            else
+                "Couldn't start scanning. Make sure Bluetooth is on, then tap Scan."
+            return
+        }
+        isDiscovering = true
+        progressBar.visibility = View.VISIBLE
+        statusText.text = "Scanning for Bluetooth devices…"
+        mainHandler.removeCallbacks(discoveryTimeout)
+        mainHandler.postDelayed(discoveryTimeout, 20_000)
+    }
+
+    /** End the scan exactly once — whether the system told us it finished or our timeout fired. */
+    private fun finishDiscovery(timedOut: Boolean) {
+        mainHandler.removeCallbacks(discoveryTimeout)
+        if (!isDiscovering && !timedOut) return
+        isDiscovering = false
+        if (timedOut) try { adapter?.cancelDiscovery() } catch (_: SecurityException) {}
+        progressBar.visibility = View.GONE
+        statusText.text = if (discoveredDevices.isEmpty())
+            "No discoverable devices found.\nOpen the Bluetooth settings screen on the OTHER device so it's discoverable, then tap Scan."
+        else
+            "Found ${discoveredDevices.size} device(s). Tap one to pair."
     }
 
     private fun updateDeviceList() {
@@ -214,6 +261,7 @@ class BluetoothPairingActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        mainHandler.removeCallbacks(discoveryTimeout)
         try { unregisterReceiver(discoveryReceiver) } catch (_: Throwable) {}
         val a = adapter ?: return
         try { if (isDiscovering) a.cancelDiscovery() } catch (_: SecurityException) {}

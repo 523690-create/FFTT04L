@@ -10,9 +10,19 @@
     <!-- Bluetooth transfer & pairing (bonded devices + discovery for in-app pairing). -->
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
-    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+    <!-- neverForLocation: we only discover devices to pair, never to derive physical location. On
+         API 31+ this lets discovery run without system Location being enabled (the Pixels were
+         spinning forever because BLUETOOTH_SCAN implied location and Location was off). -->
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <!-- Pre-31 Bluetooth discovery returns no results without location permission. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30" />
     <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
+    <!-- Recordings live in public storage (/sdcard/Documents/FFTT04M) so they survive uninstall.
+         API ≤29 uses WRITE_EXTERNAL_STORAGE; API 30+ uses MANAGE_EXTERNAL_STORAGE ("All files access"). -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
     <!-- Background transfer + per-file notifications. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
@@ -27,6 +37,7 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
+        android:requestLegacyExternalStorage="true"
         android:theme="@style/Theme.FFTT04M">
 
         <activity
@@ -92,12 +103,14 @@
             android:name=".BtSendActivity"
             android:exported="false"
             android:label="Send via Bluetooth"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden"
             android:screenOrientation="fullSensor" />
 
         <activity
             android:name=".BluetoothPairingActivity"
             android:exported="false"
             android:label="Pair Bluetooth Device"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden"
             android:screenOrientation="fullSensor" />
 
         <service

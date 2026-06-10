@@ -1,6 +1,12 @@
 package com.example.FFTT04M
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
+import android.os.Environment
+import androidx.core.content.ContextCompat
+import androidx.core.content.edit
 import org.json.JSONObject
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
@@ -45,10 +51,97 @@ object GalleryTransfer {
         return "rec_" + buildString { for (c in base) append(if (c.isLetterOrDigit()) c else '_') }
     }
 
-    /** Recordings live in the EXTERNAL files dir (same as GalleryActivity/MainActivity) — NOT the
-     *  internal filesDir. Using the wrong one made Send see "no recordings" and Import write to a
-     *  place the Gallery doesn't read. */
-    fun recordingsDir(ctx: Context): File? = ctx.getExternalFilesDir(null)
+    // ---- Storage location -----------------------------------------------------------------------
+    // Recordings live in PUBLIC storage (/sdcard/Documents/FFTT04M) so they survive an app
+    // uninstall/reinstall — the old app-private getExternalFilesDir(null) is wiped on uninstall.
+    // Access needs WRITE_EXTERNAL_STORAGE (API ≤29) or MANAGE_EXTERNAL_STORAGE / "All files access"
+    // (API 30+). Until that's granted we fall back to the app-private dir so the app still works.
+
+    const val PUBLIC_SUBDIR = "FFTT04M"
+    private const val MIGRATED_FLAG = "migrated_public_v1"
+
+    /** The intended public recordings folder (may not yet be writable if permission isn't granted). */
+    fun publicDir(): File =
+        File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS), PUBLIC_SUBDIR)
+
+    /** True once the app may read/write arbitrary files in public storage. */
+    fun hasPublicStorageAccess(ctx: Context): Boolean = when {
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> Environment.isExternalStorageManager()
+        else -> ContextCompat.checkSelfPermission(ctx, Manifest.permission.WRITE_EXTERNAL_STORAGE) ==
+            PackageManager.PERMISSION_GRANTED
+    }
+
+    /** Where recordings actually live right now: the public folder when accessible (survives
+     *  uninstall), otherwise the legacy app-private dir as a graceful fallback. */
+    fun recordingsDir(ctx: Context): File? {
+        if (hasPublicStorageAccess(ctx)) {
+            val pub = publicDir()
+            if (pub.exists() || pub.mkdirs()) return pub
+        }
+        return ctx.getExternalFilesDir(null)
+    }
+
+    /** One-time copy of existing recordings (and their .png/.txt/.json sidecars) from the old
+     *  app-private dir into public storage, generating a settings sidecar for each so their analysis
+     *  state survives future uninstalls too. No-op until public access is granted; idempotent. */
+    fun migrateToPublicIfNeeded(ctx: Context) {
+        if (!hasPublicStorageAccess(ctx)) return
+        val sp = ctx.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
+        if (sp.getBoolean(MIGRATED_FLAG, false)) return
+        val src = ctx.getExternalFilesDir(null) ?: return
+        val dst = publicDir()
+        if (!dst.exists() && !dst.mkdirs()) return
+        val files = src.listFiles() ?: emptyArray()
+        for (f in files) {
+            if (!f.isFile) continue
+            val target = File(dst, f.name)
+            if (!target.exists()) runCatching { f.copyTo(target, overwrite = false) }
+        }
+        // Settings sidecars for the migrated recordings (their rec_<base> prefs still exist now).
+        files.filter { it.extension == "wav" || it.extension == "flac" }
+            .map { it.nameWithoutExtension }.toSet()
+            .forEach { base ->
+                val side = File(dst, "$base.json")
+                if (!side.exists()) runCatching { side.writeText(metaJsonFor(ctx, base)) }
+            }
+        sp.edit { putBoolean(MIGRATED_FLAG, true) }
+    }
+
+    // ---- Per-recording settings sidecar (<base>.json next to the audio) -------------------------
+
+    /** Serialize a recording's per-recording SharedPreferences to the same tagged-JSON the transfer
+     *  bundle uses ("f:1.0", "i:3", "b:true", "s:…", "l:…"). */
+    fun metaJsonFor(ctx: Context, base: String): String {
+        val prefs = ctx.getSharedPreferences(prefsNameForFile("$base.wav"), Context.MODE_PRIVATE)
+        val meta = JSONObject()
+        for ((k, v) in prefs.all) {
+            if (v == null) continue
+            meta.put(k, when (v) {
+                is Boolean -> "b:$v"; is Int -> "i:$v"; is Long -> "l:$v"; is Float -> "f:$v"; else -> "s:$v"
+            })
+        }
+        return meta.toString()
+    }
+
+    /** Write/refresh the <base>.json settings sidecar so the recording's analysis state survives an
+     *  uninstall (the rec_<base> prefs themselves live in app-private storage that gets wiped). */
+    fun writeMetaSidecar(ctx: Context, base: String) {
+        val dir = recordingsDir(ctx) ?: return
+        if (!File(dir, "$base.wav").exists() && !File(dir, "$base.flac").exists()) return
+        runCatching { File(dir, "$base.json").writeText(metaJsonFor(ctx, base)) }
+    }
+
+    /** After a reinstall the app-private rec_<base> prefs are gone; if a sidecar survived in public
+     *  storage, restore them. Tier-gated: legacy/low-RAM devices skip the restore entirely so they
+     *  never try to apply heavy settings (mirrors the import path). */
+    fun restoreMetaSidecarIfNeeded(ctx: Context, base: String) {
+        if (DeviceCaps.tier(ctx) < 1) return
+        val prefs = ctx.getSharedPreferences(prefsNameForFile("$base.wav"), Context.MODE_PRIVATE)
+        if (prefs.all.isNotEmpty()) return
+        val dir = recordingsDir(ctx) ?: return
+        val f = File(dir, "$base.json")
+        if (f.exists()) runCatching { restoreMeta(ctx, base, f.readText()) }
+    }
 
     fun recordingWavs(ctx: Context): List<File> =
         recordingsDir(ctx)?.listFiles { f -> f.extension == "wav" || f.extension == "flac" }
@@ -64,15 +157,34 @@ object GalleryTransfer {
     //   sender   → receiver: a ZIP bundle — full package for recordings the receiver lacks, plus the
     //                        comment (.txt) ONLY for recordings it already has (so comments sync), EOF.
 
+    /** Live per-file progress reported by the sender. [sentBytes]/[totalBytes] track THIS recording's
+     *  audio; [bytesPerSec] is its running throughput; [fileIndex]/[fileTotal] count NEW recordings. */
+    data class SendProgress(
+        val base: String,
+        val sentBytes: Long,
+        val totalBytes: Long,
+        val bytesPerSec: Long,
+        val fileIndex: Int,
+        val fileTotal: Int
+    )
+
     /** Sender side: verify the token, read the receiver's existing names, stream the bundle.
-     *  Returns how many NEW recordings were sent (or -1 on token mismatch). */
-    fun sendNegotiated(ctx: Context, inp: InputStream, out: OutputStream, expectedToken: String): Int {
+     *  Returns how many NEW recordings were sent (or -1 on token mismatch).
+     *  [onNegotiated] fires once with the base names the receiver ALREADY has (so the UI can mark
+     *  them "already on receiver"). [onProgress] fires repeatedly per NEW recording as it streams. */
+    fun sendNegotiated(ctx: Context, inp: InputStream, out: OutputStream, expectedToken: String,
+                       onNegotiated: ((alreadyHave: Set<String>) -> Unit)? = null,
+                       onProgress: ((SendProgress) -> Unit)? = null): Int {
         if (readLine(inp) != expectedToken) return -1
         val have = readLine(inp).split(",").filter { it.isNotEmpty() }.toHashSet()
+        onNegotiated?.invoke(have)
         val all = recordingWavs(ctx)
-        buildBundle(ctx, all, out, commentOnlyFor = have)
-        out.flush()
-        return all.count { it.nameWithoutExtension !in have }
+        val totalNew = all.count { it.nameWithoutExtension !in have }
+        buildBundle(ctx, all, out, commentOnlyFor = have, onProgress = onProgress, totalNew = totalNew)
+        // The receiver may close as soon as it has read all entry data (ZipInputStream stops at the
+        // central-directory marker), so a broken-pipe here is benign — the payload already landed.
+        try { out.flush() } catch (_: Throwable) {}
+        return totalNew
     }
 
     /** Receiver side: send the token + our existing names, then import the streamed bundle. */
@@ -87,13 +199,16 @@ object GalleryTransfer {
     // ---- Export ---------------------------------------------------------------------------------
 
     /** Build a transfer bundle. For recordings whose base name is in [commentOnlyFor] (the receiver
-     *  already has them) only the comment .txt is included, so comments sync without re-sending audio. */
-    fun buildBundle(ctx: Context, wavs: List<File>, out: OutputStream, commentOnlyFor: Set<String> = emptySet()) {
+     *  already has them) only the comment .txt is included, so comments sync without re-sending audio.
+     *  [onProgress] fires repeatedly per NEW recording (throttled to ~10 Hz) as its audio streams. */
+    fun buildBundle(ctx: Context, wavs: List<File>, out: OutputStream, commentOnlyFor: Set<String> = emptySet(),
+                    onProgress: ((SendProgress) -> Unit)? = null, totalNew: Int = 0) {
         ZipOutputStream(BufferedOutputStream(out)).use { zip ->
             val manifest = JSONObject()
                 .put("app", "FFTT04M").put("schema", 1).put("count", wavs.size)
             writeEntry(zip, "manifest.json", manifest.toString().toByteArray())
 
+            var idx = 0
             for (wav in wavs) {
                 val base = wav.nameWithoutExtension
                 if (base in commentOnlyFor) {
@@ -101,7 +216,23 @@ object GalleryTransfer {
                     File(wav.parentFile, "$base.txt").takeIf { it.exists() }?.let { addFile(zip, it) }
                     continue
                 }
-                addFile(zip, wav)
+                idx++
+                val total = wav.length()
+                val startNs = System.nanoTime()
+                var sent = 0L
+                var lastEmitNs = 0L
+                // Emit a 0% marker so the UI flips this row to "active" the instant it starts.
+                onProgress?.invoke(SendProgress(base, 0L, total, 0L, idx, totalNew))
+                addFile(zip, wav) { n ->
+                    sent += n
+                    val nowNs = System.nanoTime()
+                    if (nowNs - lastEmitNs >= 100_000_000L || sent >= total) {   // throttle to ~10 Hz
+                        lastEmitNs = nowNs
+                        val elapsed = (nowNs - startNs) / 1_000_000_000.0
+                        val bps = if (elapsed > 0.0) (sent / elapsed).toLong() else 0L
+                        onProgress?.invoke(SendProgress(base, sent, total, bps, idx, totalNew))
+                    }
+                }
                 File(wav.parentFile, "$base.png").takeIf { it.exists() }?.let { addFile(zip, it) }
                 File(wav.parentFile, "$base.txt").takeIf { it.exists() }?.let { addFile(zip, it) }
 
@@ -127,9 +258,24 @@ object GalleryTransfer {
         out.flush()
     }
 
-    private fun addFile(zip: ZipOutputStream, f: File) {
+    private fun addFile(zip: ZipOutputStream, f: File, onBytes: ((Int) -> Unit)? = null) {
         zip.putNextEntry(ZipEntry(f.name))
-        f.inputStream().use { it.copyTo(zip) }
+        f.inputStream().use { input ->
+            if (onBytes == null) {
+                input.copyTo(zip)
+            } else {
+                // 8 KB (not 64 KB) chunks: each zip.write blocks at Bluetooth wire speed, so the chunk
+                // size IS the progress granularity. 8 KB gives ~8x smoother bar movement; the ~10 Hz
+                // throttle in buildBundle keeps the UI update rate sane at high throughput.
+                val buf = ByteArray(8 * 1024)
+                while (true) {
+                    val n = input.read(buf)
+                    if (n < 0) break
+                    zip.write(buf, 0, n)
+                    onBytes(n)
+                }
+            }
+        }
         zip.closeEntry()
     }
 
@@ -200,7 +346,7 @@ object GalleryTransfer {
     /** Outcome of [importBundle]: how many recordings were added vs skipped as already-present. */
     data class ImportResult(val imported: Int, val skipped: Int)
 
-    private fun restoreMeta(ctx: Context, base: String, jsonText: String) {
+    fun restoreMeta(ctx: Context, base: String, jsonText: String) {
         val o = try { JSONObject(jsonText) } catch (_: Exception) { return }
         val ed = ctx.getSharedPreferences(prefsNameForFile("$base.wav"), Context.MODE_PRIVATE).edit()
         for (k in o.keys()) {

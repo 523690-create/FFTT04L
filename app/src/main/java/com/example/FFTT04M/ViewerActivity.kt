@@ -107,6 +107,9 @@ class ViewerActivity : AppCompatActivity() {
         viewerFft = findViewById(R.id.viewerFft)
         viewerProgress = findViewById(R.id.viewerProgress)
         filePath = intent.getStringExtra("FILE_PATH")
+        // After a reinstall the app-private per-recording prefs are gone; restore them from the
+        // <base>.json sidecar in public storage if one survived (tier-gated for legacy devices).
+        filePath?.let { GalleryTransfer.restoreMetaSidecarIfNeeded(this, File(it).nameWithoutExtension) }
         // Persist analysis/display settings per recording: each file gets its own prefs namespace.
         prefs = getSharedPreferences(prefsNameForFile(filePath), Context.MODE_PRIVATE)
 
@@ -1243,14 +1246,8 @@ class ViewerActivity : AppCompatActivity() {
         }
 
         val processed = applyEnhancements(accumulationBuffer)
-        // Retain for WYSIWYH processed playback (skip on low-RAM devices to avoid OOM).
-        if (DeviceCaps.tier(this) >= 1) {
-            lastOrigGrid = accumulationBuffer
-            lastProcGrid = processed
-            lastGridFftSize = currentFftSize
-            lastGridStep = currentStepSize
-            lastGridViewHeight = viewHeight
-        }
+        // Retain for WYSIWYH processed playback (tier-gated inside; skipped on low-RAM devices).
+        retainWysiwyhGrids(accumulationBuffer, processed, currentFftSize, currentStepSize, viewHeight)
         var enhMax = 1e-9f
         for (col in processed) for (v in col) if (v > enhMax) enhMax = v
         val maxDB = 20 * log10(enhMax + 1e-9f)
@@ -1346,6 +1343,9 @@ class ViewerActivity : AppCompatActivity() {
         }
 
         val processed = applyEnhancements(combined)
+        // WYSIWYH: enhanced (Sweep+ multi-resolution + post-processors) vs a plain 512/256 baseline.
+        retainWysiwyhGrids(plainBaselineGrid(filteredPcm, baseSize, baseStep, baseHistory, viewHeight),
+            processed, baseSize, baseStep, viewHeight)
         var enhMax = 1e-9f
         for (col in processed) for (v in col) if (v > enhMax) enhMax = v
         val maxDB = 20 * log10(enhMax + 1e-9f)
@@ -1394,7 +1394,52 @@ class ViewerActivity : AppCompatActivity() {
      * Stacks the selected post-processors, converts to dB across an 80 dB window, and pushes
      * columns - the same finishing path the Sweep+/STFT engines use, factored out for reuse.
      */
-    private fun renderEngineMap(refreshId: Int, baseSize: Int, baseStep: Int, map: Array<FloatArray>) {
+    /** Plain single-resolution STFT magnitude grid in DISPLAY coords (80–10000 Hz log over [viewHeight]
+     *  rows; [columns] columns spaced [step] apart, [size] window). Serves as the un-enhanced baseline
+     *  so processed playback can recover the pure enhancement gain (enhanced ÷ plain) for ANY engine. */
+    private fun plainBaselineGrid(filtered: FloatArray, size: Int, step: Int, columns: Int, viewHeight: Int): Array<FloatArray> {
+        val logMin = log10(engineMinFreq); val logMax = log10(engineMaxFreq)
+        val mapping = IntArray(viewHeight) { y ->
+            val logF = logMax - (y.toFloat() / viewHeight) * (logMax - logMin)
+            val freq = 10.0.pow(logF.toDouble()).toFloat()
+            (freq * size / sampleRate).toInt().coerceIn(0, size / 2 - 1)
+        }
+        val hann = FloatArray(size) { (0.5f * (1 - cos(2 * PI * it / (size - 1)))).toFloat() }
+        val grid = Array(columns) { FloatArray(viewHeight) }
+        for (c in 0 until columns) {
+            val start = c * step
+            if (start + size > filtered.size) break
+            val re = FloatArray(size); val im = FloatArray(size)
+            for (i in 0 until size) re[i] = filtered[start + i] * hann[i]
+            FFTUtils.compute(re, im)
+            for (y in 0 until viewHeight) {
+                val bin = mapping[y]
+                grid[c][y] = sqrt(re[bin] * re[bin] + im[bin] * im[bin])
+            }
+        }
+        return grid
+    }
+
+    /** Retain the (baseline, enhanced) display grids for WYSIWYH processed playback. The baseline is
+     *  rescaled to the enhanced grid's overall level so the playback gain (proc÷orig) is a ~unit-mean
+     *  RELATIVE reshaping — an engine transform can sit on a very different magnitude scale, which
+     *  would otherwise saturate the gain clamp uniformly and leave the enhancement inaudible. Tier-
+     *  gated so low-RAM devices skip the extra grids (playback then just does EQ + noise filter). */
+    private fun retainWysiwyhGrids(orig: Array<FloatArray>, proc: Array<FloatArray>, fft: Int, step: Int, vh: Int) {
+        if (DeviceCaps.tier(this) < 1) { lastOrigGrid = null; lastProcGrid = null; return }
+        var so = 0.0; var sp = 0.0
+        for (col in orig) for (v in col) so += v
+        for (col in proc) for (v in col) sp += v
+        val k = if (so > 1e-9) (sp / so).toFloat() else 1f
+        lastOrigGrid = if (kotlin.math.abs(k - 1f) < 1e-3f) orig
+            else Array(orig.size) { c -> FloatArray(orig[c].size) { i -> orig[c][i] * k } }
+        lastProcGrid = proc
+        lastGridFftSize = fft
+        lastGridStep = step
+        lastGridViewHeight = vh
+    }
+
+    private fun renderEngineMap(refreshId: Int, baseSize: Int, baseStep: Int, map: Array<FloatArray>, filtered: FloatArray) {
         val baseHistory = map.size
         if (baseHistory == 0) return
         val viewHeight = map[0].size
@@ -1406,6 +1451,9 @@ class ViewerActivity : AppCompatActivity() {
             viewerFft.isFrozen = true
         }
         val processed = applyEnhancements(map)
+        // WYSIWYH: enhanced (engine + post-processors) vs a plain 512/256 STFT baseline.
+        retainWysiwyhGrids(plainBaselineGrid(filtered, baseSize, baseStep, baseHistory, viewHeight),
+            processed, baseSize, baseStep, viewHeight)
         var enhMax = 1e-9f
         for (col in processed) for (v in col) if (v > enhMax) enhMax = v
         val maxDB = 20 * log10(enhMax + 1e-9f)
@@ -1489,7 +1537,7 @@ class ViewerActivity : AppCompatActivity() {
             }
         }
 
-        renderEngineMap(refreshId, baseSize, baseStep, combined)
+        renderEngineMap(refreshId, baseSize, baseStep, combined, filtered)
     }
 
     /**
@@ -1573,7 +1621,7 @@ class ViewerActivity : AppCompatActivity() {
 
         // Power -> magnitude for the shared dB tail.
         for (c in 0 until baseHistory) for (y in 0 until viewHeight) combined[c][y] = sqrt(combined[c][y])
-        renderEngineMap(refreshId, baseSize, baseStep, combined)
+        renderEngineMap(refreshId, baseSize, baseStep, combined, filtered)
     }
 
     /**
@@ -1638,7 +1686,7 @@ class ViewerActivity : AppCompatActivity() {
             col++
         }
 
-        renderEngineMap(refreshId, baseSize, baseStep, combined)
+        renderEngineMap(refreshId, baseSize, baseStep, combined, filtered)
     }
 
     /**
@@ -1695,7 +1743,7 @@ class ViewerActivity : AppCompatActivity() {
             for (y in 0 until viewHeight) combined[c][y] = sqrt(avgPow[mapping[y]] * invK)
         }
 
-        renderEngineMap(refreshId, baseSize, baseStep, combined)
+        renderEngineMap(refreshId, baseSize, baseStep, combined, filtered)
     }
 
     private fun playAudio() {
@@ -1831,12 +1879,14 @@ class ViewerActivity : AppCompatActivity() {
     }
 
     /**
-     * PROCESSED PLAYBACK — hear the EQ + noise-filter applied to the recording (vs. the raw PLAY
-     * button). EQ is the time-domain biquads; the noise filter is spectral subtraction reconstructed
-     * with Hann analysis+synthesis windows and COLA overlap-add normalization (the raw player skips
-     * this on purpose). Output is peak-normalized so EQ boosts don't clip. DISPLAY-tab image
-     * enhancements (Gabor/Frangi/Reassignment/etc.) are not audio-invertible and are NOT applied.
-     * EXPERIMENTAL — needs on-device listening to tune.
+     * PROCESSED PLAYBACK — hear EQ + noise filter + ENHANCE applied to the recording (vs. the raw
+     * PLAY button). EQ is the time-domain biquads; the noise filter is spectral subtraction with Hann
+     * analysis+synthesis windows and COLA overlap-add. ENHANCE is WYSIWYH: the displayed enhancement
+     * (engine transform and/or post-processors) is turned into a per-frequency gain mask = enhanced ÷
+     * plain-baseline display grid, applied to the STFT magnitudes (original phase retained). Engine
+     * transforms aren't truly invertible, so this is a spectral-ENVELOPE approximation — "sounds like
+     * it looks" — clamped to [0,8]× per bin. Output is peak-normalized so boosts don't clip.
+     * EXPERIMENTAL — the clamp range and baseline scaling are the knobs to tune by ear.
      */
     private fun playProcessedAudio() {
         val pcm = rawPcmData ?: return
@@ -1857,18 +1907,18 @@ class ViewerActivity : AppCompatActivity() {
                 out[i] = s
             }
 
-            val n = currentFftSize
-            // WYSIWYH enhance is available when the retained grids match the current FFT params
-            // (standard render, tier ≥ 1). The grids already include EQ + noise filter, so the
-            // processed/original RATIO is the pure ENHANCE gain (EQ/filter cancel) — applied on top
-            // of the time-domain EQ (step 1) and spectral noise filter (below).
-            val applyEnhance = procGrid != null && origGrid != null &&
-                gridFft == n && gridStep == currentStepSize && gridVH > 0
+            // WYSIWYH enhance: the retained grids carry the displayed enhancement (engine transform
+            // and/or post-processors) vs a plain baseline, in DISPLAY coords. Drive this pass from the
+            // grid's OWN fft size/step (engines use 512/256; the standard render uses the live params)
+            // so columns and the bin→row mapping line up. proc÷orig is the pure ENHANCE gain — EQ and
+            // the noise filter cancel in the ratio and are (re)applied explicitly in step 1 and below.
+            val applyEnhance = procGrid != null && origGrid != null && gridFft >= 2 && gridVH > 0
+            val n = if (applyEnhance) gridFft else currentFftSize
             val applyNoise = noiseFilterStrength > 0f
 
             // 2) Single WOLA STFT pass: noise subtraction + enhance gain, original phase retained.
             if ((applyNoise || applyEnhance) && n >= 2) {
-                val step = currentStepSize.coerceAtLeast(1)
+                val step = (if (applyEnhance) gridStep else currentStepSize).coerceAtLeast(1)
                 val win = FloatArray(n) { (0.5f * (1 - cos(2 * PI * it / (n - 1)))).toFloat() }
                 val acc = FloatArray(out.size)
                 val wsum = FloatArray(out.size)            // Σ synthesis-window² for COLA normalization
@@ -1942,6 +1992,12 @@ class ViewerActivity : AppCompatActivity() {
         
         mediaPlayer?.release()
         mediaPlayer = null
+    }
+
+    override fun onPause() {
+        super.onPause()
+        // Mirror this recording's current settings to its <base>.json sidecar so they survive uninstall.
+        filePath?.let { GalleryTransfer.writeMetaSidecar(this, File(it).nameWithoutExtension) }
     }
 
     override fun onDestroy() {

@@ -461,7 +461,7 @@ class FFTHeatMapView @JvmOverloads constructor(
         val full = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         draw(Canvas(full))
         val icon = Bitmap.createScaledBitmap(full, 256, 256, true)
-        val file = File(context.getExternalFilesDir(null), fileName)
+        val file = File(GalleryTransfer.recordingsDir(context), fileName)
         FileOutputStream(file).use { out ->
             icon.compress(Bitmap.CompressFormat.PNG, 100, out)
         }
@@ -478,7 +478,7 @@ class FFTHeatMapView @JvmOverloads constructor(
         val bottom = cropRect.bottom.toInt().coerceIn(top + 1, height)
         val cropped = Bitmap.createBitmap(fullRender, left, top, right - left, bottom - top)
         val icon = Bitmap.createScaledBitmap(cropped, 256, 256, true)
-        val file = File(context.getExternalFilesDir(null), fileName)
+        val file = File(GalleryTransfer.recordingsDir(context), fileName)
         FileOutputStream(file).use { out ->
             icon.compress(Bitmap.CompressFormat.PNG, 100, out)
         }

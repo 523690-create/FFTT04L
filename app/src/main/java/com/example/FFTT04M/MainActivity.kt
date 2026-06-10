@@ -15,6 +15,8 @@ import android.media.AudioTrack
 import android.media.MediaCodec
 import android.media.MediaFormat
 import android.media.MediaRecorder
+import android.net.Uri
+import android.provider.Settings
 import android.graphics.Color
 import android.content.res.ColorStateList
 import android.content.res.Configuration
@@ -31,6 +33,7 @@ import android.widget.LinearLayout
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -43,6 +46,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.concurrent.thread
 import kotlin.math.*
 
 class MainActivity : AppCompatActivity() {
@@ -181,20 +185,81 @@ class MainActivity : AppCompatActivity() {
         }
 
         requestPermissions()
+        ensureStorageAccess()
+    }
+
+    // Returns from the system "All files access" settings screen (API 30+); migrate if now granted.
+    private val allFilesLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        if (GalleryTransfer.hasPublicStorageAccess(this)) runMigration()
+    }
+
+    /** Ensure recordings can live in public storage (Documents/FFTT04M) so they survive uninstall.
+     *  API ≤29: WRITE_EXTERNAL_STORAGE rides along in the up-front batch. API 30+: "All files access"
+     *  can only be granted from Settings, so explain why and deep-link there. */
+    private fun ensureStorageAccess() {
+        if (GalleryTransfer.hasPublicStorageAccess(this)) { runMigration(); return }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            AlertDialog.Builder(this)
+                .setTitle("Keep recordings after uninstall")
+                .setMessage("To store recordings in Documents/FFTT04M so they survive reinstalling the app, " +
+                    "allow “All files access” on the next screen.")
+                .setPositiveButton("Open settings") { _, _ ->
+                    val pkgIntent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                        Uri.parse("package:$packageName"))
+                    try { allFilesLauncher.launch(pkgIntent) } catch (_: Exception) {
+                        try { allFilesLauncher.launch(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)) }
+                        catch (_: Exception) {}
+                    }
+                }
+                .setNegativeButton("Not now", null)
+                .show()
+        }
+    }
+
+    private fun runMigration() {
+        thread { try { GalleryTransfer.migrateToPublicIfNeeded(this) } catch (_: Throwable) {} }
     }
 
     private fun requestPermissions() {
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), 100)
+        // Ask for everything the app can ever need, once, up front — so device-to-device transfer
+        // and in-app pairing never surprise the user with a camera/Bluetooth prompt mid-flow. Only
+        // RECORD_AUDIO is critical (it gates audio init); the rest are best-effort pre-grants.
+        val wanted = mutableListOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.CAMERA)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            wanted += Manifest.permission.BLUETOOTH_CONNECT
+            wanted += Manifest.permission.BLUETOOTH_SCAN
         } else {
+            // Pre-31 Bluetooth discovery needs location to return any results.
+            wanted += Manifest.permission.ACCESS_FINE_LOCATION
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            wanted += Manifest.permission.POST_NOTIFICATIONS
+        }
+        // API ≤29 reaches public storage via WRITE_EXTERNAL_STORAGE (API 30+ uses All-files access).
+        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) {
+            wanted += Manifest.permission.WRITE_EXTERNAL_STORAGE
+        }
+        val toAsk = wanted.filter {
+            ActivityCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }
+        if (toAsk.isEmpty()) {
             initAudio()
+        } else {
+            ActivityCompat.requestPermissions(this, toAsk.toTypedArray(), 100)
         }
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == 100 && grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-            initAudio()
+        if (requestCode == 100) {
+            // The batch may include several permissions; find RECORD_AUDIO's result specifically
+            // rather than assuming it's first, then gate audio init on it.
+            val i = permissions.indexOf(Manifest.permission.RECORD_AUDIO)
+            val audioGranted = if (i >= 0) grantResults.getOrNull(i) == PackageManager.PERMISSION_GRANTED
+                else ActivityCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+            if (audioGranted) initAudio()
+            // If WRITE_EXTERNAL_STORAGE (API ≤29) was just granted, migrate recordings to public storage.
+            if (GalleryTransfer.hasPublicStorageAccess(this)) runMigration()
         }
     }
 
@@ -261,7 +326,7 @@ class MainActivity : AppCompatActivity() {
         val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
         // Audio is saved by saveFragmentAudio below: FLAC preferred, WAV fallback.
         
-        saveFragmentAudio(getExternalFilesDir(null), timestamp, fragment)
+        saveFragmentAudio(GalleryTransfer.recordingsDir(this), timestamp, fragment)
         fftHeatMap.saveIcon(rect, "$timestamp.png")
         
         hideFrozenUi()

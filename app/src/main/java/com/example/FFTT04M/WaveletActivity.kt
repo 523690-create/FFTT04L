@@ -132,6 +132,9 @@ class WaveletActivity : AppCompatActivity() {
         txtSafetyStatus = findViewById(R.id.txtSafetyStatus)
 
         filePath = intent.getStringExtra("FILE_PATH")
+        // After a reinstall, restore per-recording settings from the <base>.json sidecar if it
+        // survived in public storage (tier-gated so legacy devices skip heavy settings).
+        filePath?.let { GalleryTransfer.restoreMetaSidecarIfNeeded(this, File(it).nameWithoutExtension) }
         // Persist analysis/display settings per recording (shares the rec_<name> namespace with the
         // FFT Viewer, so e.g. the colour scheme stays consistent for a given recording).
         prefs = getSharedPreferences(prefsNameForFile(filePath), MODE_PRIVATE)
@@ -178,6 +181,12 @@ class WaveletActivity : AppCompatActivity() {
         val initial = prefs.getInt("wavelet_tab", 0).coerceIn(0, tabs.tabCount - 1)
         tabs.getTabAt(initial)?.select()
         show(initial)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        // Mirror this recording's current settings to its <base>.json sidecar so they survive uninstall.
+        filePath?.let { GalleryTransfer.writeMetaSidecar(this, File(it).nameWithoutExtension) }
     }
 
     /** Per-recording settings namespace; mirrors ViewerActivity.prefsNameForFile. */
