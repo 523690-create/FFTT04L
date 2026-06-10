@@ -9,6 +9,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import java.util.Locale
 import kotlin.math.*
 
 class LatencyActivity : AppCompatActivity() {
@@ -85,7 +86,7 @@ class LatencyActivity : AppCompatActivity() {
 
                 val latencyMs = calculateLatency(chirp, recorded)
                 runOnUiThread {
-                    txtResult.text = "Result: ${String.format("%.2f", latencyMs)} ms"
+                    txtResult.text = "Result: ${String.format(Locale.US, "%.2f", latencyMs)} ms"
                     btnMeasure.isEnabled = true
                 }
 

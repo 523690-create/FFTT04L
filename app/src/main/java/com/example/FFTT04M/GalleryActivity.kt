@@ -202,6 +202,7 @@ class GalleryActivity : AppCompatActivity() {
     /** SHARE → Bluetooth (paired, no network), Wi-Fi QR (same LAN), or file (any network). */
     private fun showShareDialog() {
         val options = arrayOf(
+            "Pair Bluetooth Device",
             "Send via Bluetooth",
             "Receive (scan QR)",
             "Send via Wi-Fi QR",
@@ -212,20 +213,21 @@ class GalleryActivity : AppCompatActivity() {
             .setTitle("Share gallery")
             .setItems(options) { _, which ->
                 when (which) {
-                    0 -> if (GalleryTransfer.recordingWavs(this).isEmpty())
+                    0 -> startActivity(Intent(this, BluetoothPairingActivity::class.java))
+                    1 -> if (GalleryTransfer.recordingWavs(this).isEmpty())
                         Toast.makeText(this, "No recordings to send", Toast.LENGTH_SHORT).show()
                     else startActivity(Intent(this, BtSendActivity::class.java))
-                    1 -> scanLauncher.launch(ScanOptions().apply {        // Wi-Fi or Bluetooth QR
+                    2 -> scanLauncher.launch(ScanOptions().apply {        // Wi-Fi or Bluetooth QR
                         setDesiredBarcodeFormats(ScanOptions.QR_CODE)
                         setPrompt("Scan the QR shown on the SENDING device")
                         setBeepEnabled(false)
                         setOrientationLocked(false)
                     })
-                    2 -> if (GalleryTransfer.recordingWavs(this).isEmpty())
+                    3 -> if (GalleryTransfer.recordingWavs(this).isEmpty())
                         Toast.makeText(this, "No recordings to send", Toast.LENGTH_SHORT).show()
                     else startActivity(Intent(this, ExportActivity::class.java))
-                    3 -> exportToFile()
-                    4 -> importFileLauncher.launch("*/*")
+                    4 -> exportToFile()
+                    5 -> importFileLauncher.launch("*/*")
                 }
             }
             .setNegativeButton("Cancel", null)
