@@ -138,13 +138,15 @@ class BluetoothPairingActivity : AppCompatActivity() {
         })
 
         adapter = (getSystemService(BluetoothManager::class.java))?.adapter
-        statusText.text = if (adapter == null) "No Bluetooth on this device" else "Ready to scan"
+        statusText.text = if (adapter == null) "No Bluetooth on this device" else "Requesting permission…"
 
         registerReceiver(discoveryReceiver, IntentFilter().apply {
             addAction(BluetoothDevice.ACTION_FOUND)
             addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED)
             addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED)
         }, if (Build.VERSION.SDK_INT >= 34) Context.RECEIVER_EXPORTED else 0)
+
+        requestScanPermissionAndStart()
     }
 
     private fun requestScanPermissionAndStart() {
