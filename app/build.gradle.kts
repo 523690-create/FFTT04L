@@ -5,6 +5,7 @@ import java.awt.font.FontRenderContext
 import java.awt.geom.AffineTransform
 import java.awt.geom.Ellipse2D
 import java.awt.geom.PathIterator
+import java.awt.geom.Rectangle2D
 import java.awt.image.BufferedImage
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -113,17 +114,19 @@ fun glyphPathData(letter: Char): String {
     return sb.toString().trim()
 }
 
+// LEGACY (FFTT04L) icon: square-in-square with REVERSED colors vs. the high-tier roundel —
+// cyan outer square, magenta inner square, cyan letter (matches the outer square).
 fun foregroundVectorXml(letter: Char): String = """<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <path android:fillColor="#FF00FF" android:pathData="M54,54m-40,0a40,40 0,1 1,80 0a40,40 0,1 1,-80 0" />
-    <path android:fillColor="#00FFFF" android:pathData="M54,54m-20,0a20,20 0,1 1,40 0a20,20 0,1 1,-40 0" />
-    <path android:fillColor="#FF00FF" android:pathData="${glyphPathData(letter)}" />
+    <path android:fillColor="#00FFFF" android:pathData="M14,14 L94,14 L94,94 L14,94 Z" />
+    <path android:fillColor="#FF00FF" android:pathData="M34,34 L74,34 L74,74 L34,74 Z" />
+    <path android:fillColor="#00FFFF" android:pathData="${glyphPathData(letter)}" />
 </vector>
 """
 
-/** Full raster icon (black bg, magenta outer disk, cyan inner disk, magenta letter) for legacy. */
+/** Full raster icon (black bg, cyan outer square, magenta inner square, cyan letter) for legacy. */
 fun renderIconRaster(letter: Char, size: Int, round: Boolean): BufferedImage {
     System.setProperty("java.awt.headless", "true")
     val img = BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB)
@@ -133,11 +136,12 @@ fun renderIconRaster(letter: Char, size: Int, round: Boolean): BufferedImage {
     val s = size.toDouble()
     fun px(v: Double) = v / 108.0 * s
     fun disk(cx: Double, cy: Double, r: Double) = Ellipse2D.Double(cx - r, cy - r, r * 2, r * 2)
+    fun square(cx: Double, cy: Double, half: Double) = Rectangle2D.Double(cx - half, cy - half, half * 2, half * 2)
     g.color = Color.BLACK
     if (round) g.fill(disk(s / 2, s / 2, s / 2)) else g.fillRect(0, 0, size, size)
-    g.color = Color(0xFF, 0x00, 0xFF); g.fill(disk(px(54.0), px(54.0), px(40.0)))
-    g.color = Color(0x00, 0xFF, 0xFF); g.fill(disk(px(54.0), px(54.0), px(20.0)))
-    g.color = Color(0xFF, 0x00, 0xFF)
+    g.color = Color(0x00, 0xFF, 0xFF); g.fill(square(px(54.0), px(54.0), px(40.0)))
+    g.color = Color(0xFF, 0x00, 0xFF); g.fill(square(px(54.0), px(54.0), px(20.0)))
+    g.color = Color(0x00, 0xFF, 0xFF)
     val outline = Font(Font.SANS_SERIF, Font.BOLD, 100)
         .createGlyphVector(g.fontRenderContext, letter.toString()).outline
     val b = outline.bounds2D
