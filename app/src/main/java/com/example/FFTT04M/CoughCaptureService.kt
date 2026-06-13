@@ -95,6 +95,8 @@ class CoughCaptureService : Service() {
         val ts = SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US).format(now)
         val dir = GalleryTransfer.recordingsDir(this) ?: filesDir
         runCatching { CoughWav.write(File(dir, "cough_$ts.wav"), c.pcm, sampleRate) }
+        // Live-refresh an open Gallery (reuses the import service's broadcast that triggers loadFiles()).
+        runCatching { sendBroadcast(Intent(TransferService.ACTION_PROGRESS).setPackage(packageName)) }
         count++
         val seconds = c.pcm.size / sampleRate.toFloat()
         val clock = SimpleDateFormat("HH:mm:ss", Locale.US).format(now)
@@ -115,9 +117,9 @@ class CoughCaptureService : Service() {
         val mgr = getSystemService(NotificationManager::class.java)
         mgr.createNotificationChannel(
             NotificationChannel(CH, "Cough auto-capture", NotificationManager.IMPORTANCE_LOW))
-        // Separate channel so each capture pings (the ongoing "Listening…" channel is silent/LOW).
+        // Separate HIGH channel so each capture pings/peeks (the ongoing "Listening…" channel is silent/LOW).
         mgr.createNotificationChannel(
-            NotificationChannel(CH_ALERT, "Cough captured", NotificationManager.IMPORTANCE_DEFAULT))
+            NotificationChannel(CH_ALERT, "Cough captured", NotificationManager.IMPORTANCE_HIGH).apply { enableVibration(true) })
     }
 
     private fun openGallery() = PendingIntent.getActivity(this, 0,
@@ -126,10 +128,12 @@ class CoughCaptureService : Service() {
 
     /** Heads-up ping on every capture: "FFT 1.4 seconds captured at 14:23:07". */
     private fun pushCaptureAlert(text: String) {
+        android.util.Log.i("CoughCapture", "alert: $text")
         val n = NotificationCompat.Builder(this, CH_ALERT)
             .setSmallIcon(android.R.drawable.stat_sys_upload_done)
             .setContentTitle("Cough captured").setContentText(text)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)        // peek (heads-up) on pre-O too
+            .setVibrate(longArrayOf(0, 60))                       // brief buzz so the ping is noticed
             .setOnlyAlertOnce(false).setAutoCancel(true)
             .setContentIntent(openGallery())
             .build()

@@ -97,33 +97,16 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
+        <!-- BACKGROUND: toggles hands-free background/locked cough auto-capture (foreground mic service). -->
         <Button
-            android:id="@+id/btnLatency"
+            android:id="@+id/btnBackground"
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_weight="40"
-            android:text="@string/btn_latency"
-            android:backgroundTint="#D3D3D3"
-            android:textColor="#000000"
+            android:layout_weight="70"
+            android:text="@string/btn_background"
+            android:backgroundTint="#444444"
+            android:textColor="#FFFFFF"
             android:layout_marginEnd="2dp"
-            android:textSize="8sp"
-            android:textStyle="bold"
-            android:padding="0dp"
-            android:insetTop="0dp"
-            android:insetBottom="0dp"
-            android:minHeight="0dp"
-            style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
-
-        <!-- COLOR: button that opens the shared gradient-swatch colour picker (like Wavelet) -->
-        <Button
-            android:id="@+id/btnColor"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="30"
-            android:layout_marginHorizontal="2dp"
-            android:text="COLOR"
-            android:backgroundTint="#FF00FF"
-            android:textColor="#000000"
             android:textSize="8sp"
             android:textStyle="bold"
             android:padding="0dp"
@@ -277,6 +260,8 @@
 
                 <View android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="2" />
 
+                <!-- Filter sliders kept (IDs intact for FFT-analysis sharing) but hidden on the Listen
+                     screen; the listening filter is forced to 0%. Latency+Color sit over this corner. -->
                 <LinearLayout
                     android:id="@+id/filterControlsLayout"
                     android:layout_width="0dp"
@@ -284,6 +269,7 @@
                     android:layout_weight="32"
                     android:orientation="horizontal"
                     android:weightSum="32"
+                    android:visibility="gone"
                     android:clipChildren="false"
                     android:clipToPadding="false">
 
@@ -312,6 +298,53 @@
                             <TextView android:id="@+id/txtFallValue" android:layout_width="match_parent" android:layout_height="match_parent" android:text="@string/label_0ms" android:textColor="#000000" android:textStyle="bold" android:gravity="center" android:elevation="4dp" android:includeFontPadding="false"/>
                         </FrameLayout>
                     </LinearLayout>
+                </LinearLayout>
+
+                <!-- Latency + Color relocated here, over the hidden filter corner. Larger font (more room). -->
+                <LinearLayout
+                    android:id="@+id/listenButtonsCorner"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="32"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:paddingHorizontal="4dp"
+                    android:paddingVertical="6dp"
+                    android:clipChildren="false"
+                    android:clipToPadding="false">
+
+                    <Button
+                        android:id="@+id/btnLatency"
+                        android:layout_width="match_parent"
+                        android:layout_height="0dp"
+                        android:layout_weight="1"
+                        android:layout_marginBottom="6dp"
+                        android:text="@string/btn_latency"
+                        android:backgroundTint="#D3D3D3"
+                        android:textColor="#000000"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:padding="0dp"
+                        android:insetTop="0dp"
+                        android:insetBottom="0dp"
+                        android:minHeight="0dp"
+                        style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
+
+                    <Button
+                        android:id="@+id/btnColor"
+                        android:layout_width="match_parent"
+                        android:layout_height="0dp"
+                        android:layout_weight="1"
+                        android:text="COLOR"
+                        android:backgroundTint="#FF00FF"
+                        android:textColor="#000000"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:padding="0dp"
+                        android:insetTop="0dp"
+                        android:insetBottom="0dp"
+                        android:minHeight="0dp"
+                        style="@style/Widget.MaterialComponents.Button.UnelevatedButton" />
                 </LinearLayout>
 
             </LinearLayout>
