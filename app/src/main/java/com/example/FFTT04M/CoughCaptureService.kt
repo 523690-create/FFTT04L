@@ -91,10 +91,14 @@ class CoughCaptureService : Service() {
     }
 
     private fun onCough(c: CoughDetector.CapturedCough) {
-        val ts = SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US).format(Date())
+        val now = Date()
+        val ts = SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US).format(now)
         val dir = GalleryTransfer.recordingsDir(this) ?: filesDir
         runCatching { CoughWav.write(File(dir, "cough_$ts.wav"), c.pcm, sampleRate) }
         count++
+        val seconds = c.pcm.size / sampleRate.toFloat()
+        val clock = SimpleDateFormat("HH:mm:ss", Locale.US).format(now)
+        pushCaptureAlert(String.format(Locale.US, "FFT %.1f seconds captured at %s", seconds, clock))
         updateNotification("Listening for coughs… ($count saved)")
     }
 
@@ -108,8 +112,28 @@ class CoughCaptureService : Service() {
     // ---- foreground notification --------------------------------------------------------------
     private fun createChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        getSystemService(NotificationManager::class.java).createNotificationChannel(
+        val mgr = getSystemService(NotificationManager::class.java)
+        mgr.createNotificationChannel(
             NotificationChannel(CH, "Cough auto-capture", NotificationManager.IMPORTANCE_LOW))
+        // Separate channel so each capture pings (the ongoing "Listening…" channel is silent/LOW).
+        mgr.createNotificationChannel(
+            NotificationChannel(CH_ALERT, "Cough captured", NotificationManager.IMPORTANCE_DEFAULT))
+    }
+
+    private fun openGallery() = PendingIntent.getActivity(this, 0,
+        Intent(this, GalleryActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+
+    /** Heads-up ping on every capture: "FFT 1.4 seconds captured at 14:23:07". */
+    private fun pushCaptureAlert(text: String) {
+        val n = NotificationCompat.Builder(this, CH_ALERT)
+            .setSmallIcon(android.R.drawable.stat_sys_upload_done)
+            .setContentTitle("Cough captured").setContentText(text)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setOnlyAlertOnce(false).setAutoCancel(true)
+            .setContentIntent(openGallery())
+            .build()
+        try { NotificationManagerCompat.from(this).notify(CAPTURE_NID, n) } catch (_: SecurityException) {}
     }
 
     private fun buildNotification(text: String): Notification {
@@ -152,7 +176,9 @@ class CoughCaptureService : Service() {
     companion object {
         @Volatile var running = false; private set
         private const val CH = "cough_capture"
+        private const val CH_ALERT = "cough_capture_alert"
         private const val NID = 4201
+        private const val CAPTURE_NID = 4202
         const val ACTION_STOP = "com.example.FFTT04M.STOP_COUGH_CAPTURE"
         fun start(ctx: Context) =
             ContextCompat.startForegroundService(ctx, Intent(ctx, CoughCaptureService::class.java))
