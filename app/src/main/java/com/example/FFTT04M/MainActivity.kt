@@ -77,6 +77,10 @@ class MainActivity : AppCompatActivity() {
     private var sampleRate = 44100
     private val fftSize = 2048
     private val stepSize = 1024
+    // Hands-free cough auto-capture on the Listen screen. Legacy-safe: any overload disables it.
+    private var coughDetector: com.example.FFTT04M.cough.CoughDetector? = null
+    private var autoCoughCount = 0
+    @Volatile private var autoCaptureDisabled = false
     
     private val eqBands = floatArrayOf(100f, 300f, 1000f, 3000f, 8000f)
     private var filters = Array(5) { i ->
@@ -748,6 +752,10 @@ class MainActivity : AppCompatActivity() {
         
         audioRecord = record
         recording.set(true)
+        // Start auto-capture unless a prior overload disabled it (legacy-safe).
+        if (!autoCaptureDisabled) coughDetector = try {
+            com.example.FFTT04M.cough.CoughDetector(sampleRate) { onAutoCough(it) }
+        } catch (t: Throwable) { autoCaptureDisabled = true; null }
         record.startRecording()
 
         recordingThread = Thread {
@@ -774,6 +782,16 @@ class MainActivity : AppCompatActivity() {
                     for (i in 0 until read) {
                         audioCircularBuffer[audioWriteIndex] = audioBuffer[i]
                         audioWriteIndex = (audioWriteIndex + 1) % audioBufferSize
+                    }
+
+                    // Feed RAW mic (pre-EQ) to the cough detector; disable on overload (legacy-safe).
+                    coughDetector?.let { det ->
+                        try {
+                            det.process(if (read == audioBuffer.size) audioBuffer.copyOf() else audioBuffer.copyOf(read))
+                        } catch (t: Throwable) {
+                            coughDetector = null; autoCaptureDisabled = true
+                            runOnUiThread { onAutoCaptureOverload() }
+                        }
                     }
 
                     // EQ affects only the waterfall: run the biquads on the samples fed to the FFT.
@@ -824,9 +842,59 @@ class MainActivity : AppCompatActivity() {
         recordingThread?.start()
     }
 
+    /**
+     * Auto-saved cough from the live mic: white borders around it in the scrolling display, the
+     * between-borders spectrogram as the recording's icon, a Gallery WAV, and a confirmation flash.
+     * Legacy-safe: any overload disables auto-capture instead of crashing.
+     */
+    private fun onAutoCough(c: com.example.FFTT04M.cough.CoughDetector.CapturedCough) {
+        try {
+            val ts = java.text.SimpleDateFormat("yyyyMMdd_HHmmss_SSS", java.util.Locale.US).format(java.util.Date())
+            val dir = GalleryTransfer.recordingsDir(this) ?: filesDir
+            val wav = java.io.File(dir, "cough_$ts.wav")
+            val png = java.io.File(dir, "cough_$ts.png")
+            val icon = fftHeatMap.markCoughAndSnapshot(c.pcm.size / stepSize)
+            autoCoughCount++
+            kotlin.concurrent.thread {                       // file I/O off the audio thread
+                runCatching { com.example.FFTT04M.cough.CoughWav.write(wav, c.pcm, sampleRate) }
+                icon?.let { bmp -> runCatching {
+                    java.io.FileOutputStream(png).use { bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+                } }
+            }
+            runOnUiThread { flashCoughSaved(autoCoughCount) }
+        } catch (t: Throwable) {
+            coughDetector = null; autoCaptureDisabled = true
+            runOnUiThread { onAutoCaptureOverload() }
+        }
+    }
+
+    private fun onAutoCaptureOverload() {
+        android.widget.Toast.makeText(this, "Auto-capture disabled (device overloaded)", android.widget.Toast.LENGTH_LONG).show()
+    }
+
+    /** Brief centred green "✓ cough saved (N)" overlay that fades out. */
+    private fun flashCoughSaved(n: Int) {
+        val root = findViewById<android.view.ViewGroup>(android.R.id.content) ?: return
+        val tv = android.widget.TextView(this).apply {
+            text = "✓ cough saved  ($n)"
+            setTextColor(0xFFFFFFFF.toInt()); setBackgroundColor(0xE0177245.toInt())
+            textSize = 22f; gravity = android.view.Gravity.CENTER
+            val p = (18 * resources.displayMetrics.density).toInt(); setPadding(p, p / 2, p, p / 2)
+        }
+        root.addView(tv, android.widget.FrameLayout.LayoutParams(
+            android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+            android.widget.FrameLayout.LayoutParams.WRAP_CONTENT, android.view.Gravity.CENTER))
+        tv.alpha = 0f
+        tv.animate().alpha(1f).setDuration(120).withEndAction {
+            tv.animate().alpha(0f).setStartDelay(850).setDuration(450).withEndAction { root.removeView(tv) }
+        }
+    }
+
     private fun stopRecording() {
         recording.set(false)
         recordingThread?.join()
+        try { coughDetector?.finish() } catch (_: Throwable) {}
+        coughDetector = null
         audioRecord?.stop()
         audioRecord?.release()
         audioRecord = null

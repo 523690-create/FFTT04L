@@ -467,6 +467,41 @@ class FFTHeatMapView @JvmOverloads constructor(
         }
     }
 
+    /**
+     * Draw white vertical borders into the spectrogram at the just-ended cough span ([durationColumns]
+     * back from the write head) so they scroll with the display, and return a 256×256 thumbnail of the
+     * region between them (the recording's default icon). Borders are always drawn; the thumbnail is
+     * OOM-guarded (optional on low-RAM legacy devices). Null if not laid out / on overload.
+     */
+    fun markCoughAndSnapshot(durationColumns: Int): Bitmap? {
+        val bitmap = spectrogramBitmap ?: return null
+        val h = bitmap.height
+        if (h <= 0) return null
+        val dur = durationColumns.coerceIn(1, maxHistory - 2)
+        val endCol = currentColumn
+        val startCol = ((endCol - dur) % maxHistory + maxHistory) % maxHistory
+        val white = IntArray(h) { Color.WHITE }
+        synchronized(bitmap) {
+            bitmap.setPixels(white, 0, 1, startCol, 0, 1, h)
+            bitmap.setPixels(white, 0, 1, endCol, 0, 1, h)
+        }
+        postInvalidate()
+        return try {
+            val widthCols = dur + 1
+            val region = IntArray(widthCols * h)
+            synchronized(bitmap) {
+                val colPx = IntArray(h)
+                for (k in 0 until widthCols) {
+                    bitmap.getPixels(colPx, 0, 1, (startCol + k) % maxHistory, 0, 1, h)
+                    for (y in 0 until h) region[y * widthCols + k] = colPx[y]
+                }
+            }
+            val regionBmp = Bitmap.createBitmap(widthCols, h, Bitmap.Config.ARGB_8888)
+            regionBmp.setPixels(region, 0, widthCols, 0, 0, widthCols, h)
+            Bitmap.createScaledBitmap(regionBmp, 256, 256, true)
+        } catch (e: Throwable) { null }      // OOM/overload → skip the icon, keep the borders
+    }
+
     fun saveIcon(cropRect: RectF, fileName: String) {
         if (width <= 0 || height <= 0) return
         val fullRender = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
