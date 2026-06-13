@@ -698,3 +698,35 @@ What the app captures and maps is **cough**. Plausible future functionality:
 
 These are research-grade features (event detection + classification) and would pair naturally
 with the higher sample rate / FFT size and auto-capture above.
+
+## SESSION 2026-06-13 — background capture + Listen reshuffle (legacy-only)
+
+### Background / lock-screen cough capture (legacy devices ONLY — by design)
+- `CoughCaptureService` (foreground **microphone** service) keeps the forest-verdict CoughDetector
+  running in the background and behind the lock screen, saving each cough as a Gallery WAV. Manifest:
+  FOREGROUND_SERVICE_MICROPHONE, WAKE_LOCK, VIBRATE; microphone-typed service. Partial wake lock keeps
+  the CPU alive screen-off; overload/mic errors stop capture instead of crashing (legacy-safe). Works
+  on Nexus 7 / J7 (API 23 → plain foreground service, no service-type needed).
+- **NOT ported to FFTT04M** — Tier-1 stays foreground-only by design (user has a legacy-device use case).
+- **Toggle:** visible **BACKGROUND** button on the Listen screen top row (replacing Latency/Color
+  there). Grey "BACKGROUND" = off, red "● CAPTURING" = on. Also in landscape next to Gallery.
+- **Notifications:** ongoing silent "Listening… (N saved)" + per-capture HIGH-priority ping
+  "FFT #.# seconds captured at HH:MM:SS" (brief vibrate so it peeks on API 23); tap opens Gallery.
+- **Live gallery refresh:** each capture broadcasts `TransferService.ACTION_PROGRESS` so an open Gallery
+  reloads immediately (reuses the import service's refresh path).
+
+### Mic mutual-exclusivity (fixes "no FFT scroll")
+The Listen live spectrogram and the background service both need the mic, which can't be shared.
+Starting the live view now **pauses the background service** (toast; toggle flips to off). If the FFT
+scroll ever fails to show, suspect the service is holding the mic.
+
+### Listen-screen reshuffle
+- Filter sliders (Filter% / Rise / Fall) are **hidden** (`visibility=gone`) but their IDs are KEPT, so
+  the shared filter code + FFT-analysis filtering still compile and work. The **Listen filter is forced
+  to 0%** regardless of any shared/FFT-analysis pref.
+- Latency + Color relocated into that corner (14sp, more legible).
+
+### Queued (mobile)
+- Wavelet screen: PLAY (MediaPlayer on `filePath` WAV) + FFT (return to viewer) buttons up top if
+  legible text fits; back button already returns to the FFT view. `btn_play`/`btn_fft` strings exist.
+- Replicate the Listen reshuffle (filter→0%, Latency/Color corner) to FFTT04M after Nexus testing.
