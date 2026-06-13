@@ -1,8 +1,29 @@
-# HANDOFF — FFTT04M (for Claude Code)
+# HANDOFF — FFTT04L (for Claude Code)
 
-Read this file first, then continue the work. This captures context that is NOT in the
-codebase or the other .md files — it lives only in the chat session that produced it.
-Date: 2026-06-05.
+> **This is the FFTT04L repo** (the redesign / legacy-device variant; package is still
+> `com.example.FFTT04M`). Earlier this file was a verbatim copy of the FFTT04M handoff — the
+> 2026-06-05 notes below are inherited from there.
+
+Read this file first, then continue the work.
+Date: 2026-06-12 (latest session below; older inherited notes follow).
+
+## SESSION 2026-06-12 — legacy auto-capture, launcher badge
+- **Ported the cough engine into FFTT04L** (it previously had none): the whole `cough/` package
+  (CoughDetector chain + `WholeClipFeatures`/`CoughForest`/`CoughClassifier` + bundled
+  `cough_forest.txt.gz`), so **legacy capture devices (J7, API 23+) can auto-capture without joining
+  the Tier-1 fleet**. FFT is shared, so the model applies as-is.
+- **Hands-free auto-capture on the Listen screen**, identical to FFTT04M (forest verdict, white
+  spectrogram borders at the cough's start/end columns, between-borders 256×256 `.png` thumbnail icon,
+  "✓ cough saved" flash) — but **legacy-safe**: detector creation, the per-frame `process()` feed, the
+  cough handler, and the icon snapshot all catch `Throwable`/`OutOfMemoryError`; on overload it
+  **disables auto-capture (toast "Auto-capture disabled (device overloaded)") instead of crashing**,
+  mirroring the wavelet-analysis OOM guard. Borders are drawn *before* the OOM-prone icon snapshot, so a
+  low-RAM miss still leaves the visual marker.
+- **Launcher-icon badge** on the FFT Listening / GALLERY titles — L's own `ic_launcher_foreground`
+  (square, cyan-letter icon) via `ViewUtils.setVersionRoundelStart()`.
+- Deployed to the J7.
+
+## (Inherited FFTT04M notes — 2026-06-05)
 
 - ✅ **Gallery Transfer Comment Sync Fix** (`HEAD`): Fixed a logic error in `GalleryTransfer.importBundle()` where `.txt` and `.png` files were skipped on modern devices if the audio recording was already present. Now, critical metadata (comments/thumbnails) always syncs, ensuring that edits made after a prior transfer are propagated correctly.
 
