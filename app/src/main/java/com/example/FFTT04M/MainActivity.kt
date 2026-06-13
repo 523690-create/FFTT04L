@@ -134,8 +134,23 @@ class MainActivity : AppCompatActivity() {
 
         btnLatency?.setOnClickListener { runLatencyMeasurement() }
 
-        findViewById<Button>(R.id.btnGallery).setOnClickListener {
-            startActivity(Intent(this, GalleryActivity::class.java))
+        findViewById<Button>(R.id.btnGallery).apply {
+            setOnClickListener { startActivity(Intent(this@MainActivity, GalleryActivity::class.java)) }
+            // Long-press: toggle hands-free background/locked cough auto-capture (foreground mic service).
+            setOnLongClickListener {
+                when {
+                    CoughCaptureService.running -> {
+                        CoughCaptureService.stop(this@MainActivity)
+                        android.widget.Toast.makeText(this@MainActivity, "Background cough capture stopped", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                    androidx.core.content.ContextCompat.checkSelfPermission(this@MainActivity, android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED -> {
+                        CoughCaptureService.start(this@MainActivity)
+                        android.widget.Toast.makeText(this@MainActivity, "Background cough capture ON — keeps listening in the background & locked. Stop it from the notification.", android.widget.Toast.LENGTH_LONG).show()
+                    }
+                    else -> android.widget.Toast.makeText(this@MainActivity, "Grant the mic first: tap Listen once, then long-press Gallery again.", android.widget.Toast.LENGTH_LONG).show()
+                }
+                true
+            }
         }
 
         findViewById<Button>(R.id.btnQuitTop).setOnClickListener {
