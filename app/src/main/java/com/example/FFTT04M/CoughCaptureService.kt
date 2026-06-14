@@ -128,6 +128,7 @@ class CoughCaptureService : Service() {
             while (capturing) {
                 val n = recorder.read(shortBuf, 0, shortBuf.size)
                 if (n <= 0) continue
+                if (playbackActive) continue   // drain but don't analyse our own playback
                 for (i in 0 until n) floatBuf[i] = shortBuf[i] / 32768f
                 try { detector.process(if (n == floatBuf.size) floatBuf else floatBuf.copyOf(n)) }
                 catch (t: Throwable) {                  // overload on a weak device → stop, don't crash
@@ -234,6 +235,9 @@ class CoughCaptureService : Service() {
 
     companion object {
         @Volatile var running = false; private set
+        /** Set true by ViewerActivity around PLAY / PLAY PROCESSED so the capture loop drains the
+         *  mic but skips analysis — otherwise our own speaker output is re-captured as new clips. */
+        @Volatile var playbackActive = false
         private const val CH = "cough_capture"
         private const val CH_ALERT = "cough_capture_alert"
         private const val NID = 4201
