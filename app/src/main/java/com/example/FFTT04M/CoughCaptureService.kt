@@ -5,12 +5,14 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.media.AudioFormat
 import android.media.AudioRecord
-import android.media.MediaRecorder
+import android.os.BatteryManager
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
@@ -28,46 +30,97 @@ import kotlin.concurrent.thread
 
 /**
  * Foreground MICROPHONE service: hands-free cough auto-capture that keeps running in the background
- * and behind the lock screen, saving each detected cough as a Gallery WAV. Designed for dedicated /
- * legacy capture devices (e.g. the J7) left listening. A persistent "Listening…" notification with a
- * Stop action is mandatory — Android only allows background mic access from a foreground service.
+ * and behind the lock screen, saving each detected cough as a Gallery WAV. A persistent
+ * "Listening…" notification with a Stop action is mandatory — Android only allows background mic
+ * access from a foreground service.
  *
- * Legacy-safe: any overload in detection stops capture rather than crashing the service. A partial
- * wake lock keeps the CPU alive with the screen off.
+ * Power policy (per user decision): capture continuously while **charging OR battery > 20%**. On
+ * battery at **≤ 20%** it pauses background capture (releases the mic + wake lock) — only the Listen
+ * screen captures in that low-battery window — and auto-resumes when charged or back above 20%.
+ *
+ * Capture uses [MicSource] (UNPROCESSED when trusted, else MIC) and the precision-favoring
+ * [CoughClassifier.PRECISION_THRESHOLD]. Legacy-safe: any overload stops capture rather than
+ * crashing; a partial wake lock keeps the CPU alive with the screen off.
  */
 class CoughCaptureService : Service() {
 
     private val sampleRate = 44100
-    @Volatile private var capturing = false
+    @Volatile private var capturing = false        // mic loop currently active
     private var captureThread: Thread? = null
     private var wakeLock: PowerManager.WakeLock? = null
     @Volatile private var count = 0
+    @Volatile private var lowBatteryPaused = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) { stopSelf(); return START_NOT_STICKY }
-        if (capturing) return START_STICKY
+        if (running) return START_STICKY
         createChannel()
         startForegroundCompat("Listening for coughs… (0 saved)")
-        acquireWakeLock()
-        capturing = true; running = true
-        captureThread = thread(name = "cough-capture-svc") { captureLoop() }
+        running = true
+        // Sticky ACTION_BATTERY_CHANGED → current state immediately; receiver handles changes.
+        val sticky = try { registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED)) }
+                     catch (_: Throwable) { null }
+        applyPowerPolicy(sticky)
         return START_STICKY   // keep listening across transient kills
+    }
+
+    // ---- power policy -------------------------------------------------------------------------
+
+    private val batteryReceiver = object : BroadcastReceiver() {
+        override fun onReceive(c: Context?, i: Intent?) = applyPowerPolicy(i)
+    }
+
+    /** Capture allowed while charging/plugged or above the low-battery floor. */
+    private fun batteryAllows(i: Intent?): Boolean {
+        if (i == null) return true
+        val status = i.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+        val plugged = i.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0
+        val charging = plugged || status == BatteryManager.BATTERY_STATUS_CHARGING ||
+                       status == BatteryManager.BATTERY_STATUS_FULL
+        val level = i.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+        val scale = i.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+        val pct = if (level >= 0 && scale > 0) level * 100 / scale else 100
+        return charging || pct > LOW_PCT
+    }
+
+    private fun applyPowerPolicy(batteryIntent: Intent?) {
+        val allow = batteryAllows(batteryIntent)
+        when {
+            allow && !capturing -> {            // (re)start capture
+                lowBatteryPaused = false
+                acquireWakeLock()
+                capturing = true
+                captureThread = thread(name = "cough-capture-svc") { captureLoop() }
+                updateNotification("Listening for coughs… ($count saved)")
+            }
+            !allow && capturing -> {            // pause for low battery
+                capturing = false
+                try { captureThread?.join(800) } catch (_: Throwable) {}
+                releaseWakeLock()
+                lowBatteryPaused = true
+                updateNotification("Paused — battery ≤$LOW_PCT%. Listen screen still captures.")
+            }
+        }
     }
 
     private fun captureLoop() {
         val minBuf = AudioRecord.getMinBufferSize(
             sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT
         ).coerceAtLeast(sampleRate / 4)
-        val recorder = try {
-            AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate,
-                AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, minBuf * 2)
-        } catch (t: Throwable) { stopSelf(); return }
-        if (recorder.state != AudioRecord.STATE_INITIALIZED) { recorder.release(); stopSelf(); return }
+        // UNPROCESSED when trusted (else MIC), with the existing legacy-safe fallback loop.
+        var recorder: AudioRecord? = null
+        for (src in MicSource.sources(this)) {
+            try {
+                val r = AudioRecord(src, sampleRate, AudioFormat.CHANNEL_IN_MONO,
+                    AudioFormat.ENCODING_PCM_16BIT, minBuf * 2)
+                if (r.state == AudioRecord.STATE_INITIALIZED) { recorder = r; break } else r.release()
+            } catch (_: Throwable) {}
+        }
+        if (recorder == null) { stopSelf(); return }
 
-        // Stopgap specificity (same as the Listen screen) until the forest is retrained on movie negatives.
-        CoughClassifier.thresholdOverride = 0.65
+        CoughClassifier.thresholdOverride = CoughClassifier.PRECISION_THRESHOLD
         val detector = CoughDetector(sampleRate) { onCough(it) }
         val shortBuf = ShortArray(minBuf); val floatBuf = FloatArray(minBuf)
         try {
@@ -105,7 +158,8 @@ class CoughCaptureService : Service() {
     }
 
     override fun onDestroy() {
-        capturing = false; running = false
+        running = false; capturing = false
+        try { unregisterReceiver(batteryReceiver) } catch (_: Throwable) {}
         try { captureThread?.join(800) } catch (_: Throwable) {}
         releaseWakeLock()
         super.onDestroy()
@@ -122,10 +176,6 @@ class CoughCaptureService : Service() {
             NotificationChannel(CH_ALERT, "Cough captured", NotificationManager.IMPORTANCE_HIGH).apply { enableVibration(true) })
     }
 
-    private fun openGallery() = PendingIntent.getActivity(this, 0,
-        Intent(this, GalleryActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
-        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-
     /** Heads-up ping on every capture: "FFT 1.4 seconds captured at 14:23:07". */
     private fun pushCaptureAlert(text: String) {
         android.util.Log.i("CoughCapture", "alert: $text")
@@ -139,6 +189,10 @@ class CoughCaptureService : Service() {
             .build()
         try { NotificationManagerCompat.from(this).notify(CAPTURE_NID, n) } catch (_: SecurityException) {}
     }
+
+    private fun openGallery() = PendingIntent.getActivity(this, 0,
+        Intent(this, GalleryActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
     private fun buildNotification(text: String): Notification {
         val stop = PendingIntent.getService(this, 1,
@@ -169,6 +223,7 @@ class CoughCaptureService : Service() {
     }
 
     private fun acquireWakeLock() {
+        if (wakeLock?.isHeld == true) return
         try {
             val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
             wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "FFTT:coughCapture")
@@ -183,6 +238,7 @@ class CoughCaptureService : Service() {
         private const val CH_ALERT = "cough_capture_alert"
         private const val NID = 4201
         private const val CAPTURE_NID = 4202
+        private const val LOW_PCT = 20          // power-saver floor: ≤20% on battery → background pauses
         const val ACTION_STOP = "com.example.FFTT04M.STOP_COUGH_CAPTURE"
         fun start(ctx: Context) =
             ContextCompat.startForegroundService(ctx, Intent(ctx, CoughCaptureService::class.java))
