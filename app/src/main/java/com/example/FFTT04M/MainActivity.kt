@@ -749,7 +749,7 @@ class MainActivity : AppCompatActivity() {
                 if (minSize <= 0) continue
                 
                 val bufSize = max(minSize, fftSize * (if (enc == AudioFormat.ENCODING_PCM_FLOAT) 4 else 2))
-                val sources = intArrayOf(MediaRecorder.AudioSource.MIC, MediaRecorder.AudioSource.CAMCORDER)
+                val sources = MicSource.sources(this@MainActivity)   // UNPROCESSED when trusted, else MIC
                 
                 for (src in sources) {
                     try {
@@ -793,7 +793,7 @@ class MainActivity : AppCompatActivity() {
         recording.set(true)
         // STOPGAP specificity for noisy real-world audio (movie speech/music) until the forest is
         // retrained with those as hard negatives. Higher threshold = fewer false captures (default 0.48).
-        com.example.FFTT04M.cough.CoughClassifier.thresholdOverride = 0.65
+        com.example.FFTT04M.cough.CoughClassifier.thresholdOverride = com.example.FFTT04M.cough.CoughClassifier.PRECISION_THRESHOLD
         // Start auto-capture unless a prior overload disabled it (legacy-safe).
         if (!autoCaptureDisabled) coughDetector = try {
             com.example.FFTT04M.cough.CoughDetector(sampleRate) { onAutoCough(it) }
