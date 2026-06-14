@@ -7,6 +7,20 @@
 Read this file first, then continue the work.
 Date: 2026-06-12 (latest session below; older inherited notes follow).
 
+## SESSION 2026-06-13b — capture-quality decisions (battery / UNPROCESSED / precision)
+Workspace moved to **D:\AndroidProjects** (fresh clones). User decisions applied to L's existing
+background-capture service (and mirrored in M):
+- **Battery policy**: `CoughCaptureService` now captures while charging OR >20%; at **≤20% on
+  battery** it pauses (releases mic + wake lock — Listen screen still captures) and auto-resumes when
+  charged or back above 20% (`LOW_PCT=20`).
+- **UNPROCESSED**: new `MicSource` → `AudioSource.UNPROCESSED` with a proactive MIC fallback
+  (API<24 / device support flag / denylist); the mic spinner (`setPreferredDevice`) is unaffected.
+  Wired into the Listen capture loop and the service.
+- **Precision**: `CoughClassifier.PRECISION_THRESHOLD = 0.65` at all real-time capture sites.
+- **Retain until dumped**: unchanged — no rotation; coughs persist until the USB dump.
+Both apps `assembleDebug` green + pushed. Always-on is now in M too (foreground-only-by-design note
+is superseded by the user's always-on decision). Not yet device-tested.
+
 ## SESSION 2026-06-12 — legacy auto-capture, launcher badge
 - **Ported the cough engine into FFTT04L** (it previously had none): the whole `cough/` package
   (CoughDetector chain + `WholeClipFeatures`/`CoughForest`/`CoughClassifier` + bundled
