@@ -22,13 +22,13 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.FFTT04M"
+        applicationId = "com.example.FFTT04L"   // distinct from M so both can coexist on one device
         minSdk = 23
         targetSdk = 36
-        // Versioning starts at major 2 with a build timestamp: "2.<yyMMdd.HHmm>".
+        // Versioning starts at major 2 with a build timestamp; "L" prefix marks this as the L variant.
         // versionCode = whole minutes since the Unix epoch (monotonic, fits Int until ~2065).
         versionCode = (System.currentTimeMillis() / 60000L).toInt()
-        versionName = "2.${SimpleDateFormat("yyMMdd.HHmm", Locale.US).format(Date())}"
+        versionName = "L2.${SimpleDateFormat("yyMMdd.HHmm", Locale.US).format(Date())}"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">FFTT04M</string>
+    <string name="app_name">FFTT04L</string>
     <string name="db_value">%1$d\ndB</string>
     <string name="percent_value">%1$d\n%%</string>
     <string name="ms_value">%1$d\nms</string>
