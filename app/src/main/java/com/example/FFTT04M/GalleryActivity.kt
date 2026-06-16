@@ -496,6 +496,12 @@ class GalleryActivity : AppCompatActivity() {
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
             val view = LayoutInflater.from(parent.context).inflate(R.layout.gallery_item, parent, false)
             applyAutoSizeText(view)
+            // Keep comments at a fixed legible size instead of auto-shrinking toward 6sp to fit.
+            view.findViewById<TextView>(R.id.itemComment)?.let {
+                androidx.core.widget.TextViewCompat.setAutoSizeTextTypeWithDefaults(
+                    it, androidx.core.widget.TextViewCompat.AUTO_SIZE_TEXT_TYPE_NONE)
+                it.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11f)
+            }
             return ViewHolder(view)
         }
 
@@ -514,8 +520,8 @@ class GalleryActivity : AppCompatActivity() {
                 holder.textView.maxLines = 1
                 holder.textView.ellipsize = android.text.TextUtils.TruncateAt.END
                 holder.commentView.gravity = android.view.Gravity.CENTER
-                holder.commentView.maxLines = 1
-                holder.commentView.ellipsize = android.text.TextUtils.TruncateAt.END
+                holder.commentView.maxLines = Int.MAX_VALUE   // show the full comment; never truncate
+                holder.commentView.ellipsize = null
             } else {
                 holder.root.orientation = LinearLayout.HORIZONTAL
                 boxParams.width = 0
@@ -525,8 +531,8 @@ class GalleryActivity : AppCompatActivity() {
                 holder.textView.gravity = android.view.Gravity.START
                 holder.textView.maxLines = Int.MAX_VALUE
                 holder.commentView.gravity = android.view.Gravity.START
-                holder.commentView.maxLines = 3
-                holder.commentView.ellipsize = android.text.TextUtils.TruncateAt.END
+                holder.commentView.maxLines = Int.MAX_VALUE   // show the full comment; never truncate
+                holder.commentView.ellipsize = null
             }
 
             holder.textView.text = file.name
