@@ -548,7 +548,9 @@ class GalleryActivity : AppCompatActivity() {
 
             val iconFile = File(file.parent, file.nameWithoutExtension + ".png")
             if (iconFile.exists()) {
-                val bitmap = BitmapFactory.decodeFile(iconFile.absolutePath)
+                // Downsample to ~half (icon shows at 64dp) to cut bitmap memory on big galleries.
+                val opts = BitmapFactory.Options().apply { inSampleSize = 2 }
+                val bitmap = BitmapFactory.decodeFile(iconFile.absolutePath, opts)
                 holder.imageView.setImageBitmap(bitmap)
             } else {
                 holder.imageView.setImageResource(android.R.drawable.ic_menu_report_image)
