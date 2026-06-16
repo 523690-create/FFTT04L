@@ -304,7 +304,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun initAudio() {
         val audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
-        availableDevices = audioManager.getDevices(AudioManager.GET_DEVICES_INPUTS).toMutableList()
+        availableDevices = enumerateInputs(audioManager)
         setupMicSpinnerWithDevices(availableDevices)
         registerDeviceCallback()
 
@@ -575,10 +575,28 @@ class MainActivity : AppCompatActivity() {
         return when (type) {
             AudioDeviceInfo.TYPE_BUILTIN_MIC -> "Built-in Mic"
             AudioDeviceInfo.TYPE_BLUETOOTH_SCO -> "Bluetooth"
+            AudioDeviceInfo.TYPE_BLE_HEADSET -> "Bluetooth"
             AudioDeviceInfo.TYPE_WIRED_HEADSET -> "Wired Headset"
             AudioDeviceInfo.TYPE_USB_DEVICE -> "USB Device"
             else -> "Other"
         }
+    }
+
+    /**
+     * Selectable inputs = real inputs, but with any BT SCO/LE entry replaced (API 31+) by its
+     * getAvailableCommunicationDevices() counterpart, which is the routable one for
+     * setCommunicationDevice(). Lets a BT mic appear in the spinner and actually record when Android
+     * exposes it (a connected wired headset can still preempt the BT comm route).
+     */
+    private fun enumerateInputs(am: AudioManager): MutableList<AudioDeviceInfo> {
+        val list = am.getDevices(AudioManager.GET_DEVICES_INPUTS).toMutableList()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            list.removeAll { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO || it.type == AudioDeviceInfo.TYPE_BLE_HEADSET }
+            for (d in am.availableCommunicationDevices) {
+                if (d.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO || d.type == AudioDeviceInfo.TYPE_BLE_HEADSET) list.add(d)
+            }
+        }
+        return list
     }
 
     private fun Slider.setSafeValue(v: Float) {
@@ -719,10 +737,12 @@ class MainActivity : AppCompatActivity() {
         // Refresh the mic spinner so it reflects what's actually connected NOW — drops a mic unplugged
         // while we were away (the stale-entry report) and surfaces newly connected ones.
         runCatching {
-            availableDevices = (getSystemService(AUDIO_SERVICE) as AudioManager)
-                .getDevices(AudioManager.GET_DEVICES_INPUTS).toMutableList()
-            android.util.Log.i("FFTT04M", "onResume inputs: [" +
-                availableDevices.joinToString { "${it.productName}/${getDeviceTypeName(it.type)}#${it.id}" } + "]")
+            val am = getSystemService(AUDIO_SERVICE) as AudioManager
+            android.util.Log.i("FFTT04M", "INPUTS: [" +
+                am.getDevices(AudioManager.GET_DEVICES_INPUTS).joinToString { "${it.productName}/t${it.type}#${it.id}" } + "]")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) android.util.Log.i("FFTT04M", "COMM: [" +
+                am.availableCommunicationDevices.joinToString { "${it.productName}/t${it.type}#${it.id}" } + "]")
+            availableDevices = enumerateInputs(am)
             setupMicSpinnerWithDevices(availableDevices)
         }
         // Returning to Listen ALWAYS resumes the live view (this is what was frozen when BACKGROUND
@@ -771,7 +791,7 @@ class MainActivity : AppCompatActivity() {
         // Drop a stale selection (e.g. a mic that disconnected while we weren't recording) so we
         // never route to a dead device; null means "system default input".
         selectedDevice?.let { sel ->
-            val stillConnected = audioManager.getDevices(AudioManager.GET_DEVICES_INPUTS).any { it.id == sel.id }
+            val stillConnected = enumerateInputs(audioManager).any { it.id == sel.id }
             if (!stillConnected) selectedDevice = null
         }
 
@@ -1114,7 +1134,7 @@ class MainActivity : AppCompatActivity() {
         // btRestarting is only used below to suppress the FALSE disconnect from our own SCO teardown.
         if (!isForeground) return
         val audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
-        availableDevices = audioManager.getDevices(AudioManager.GET_DEVICES_INPUTS).toMutableList()
+        availableDevices = enumerateInputs(audioManager)
         android.util.Log.i("FFTT04M", "devices changed: [" +
             availableDevices.joinToString { "${it.productName}/${getDeviceTypeName(it.type)}#${it.id}" } +
             "] selected=${selectedDevice?.productName}#${selectedDevice?.id} btRestarting=$btRestarting")
